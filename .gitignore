@@ -1,0 +1,66 @@
+# Secrets & Environment variables
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.*
+*secret*output*
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+htmlcov/
+.coverage
+dist/
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+parts/
+var/
+wheels/
+*.egg
+
+# Node & Next.js
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+coverage/
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+NUL
+.idea/
+.vscode/
+
+# Logs and Temp
+*.log
+tmp/
+temp/
+*.bak
+*.swp
+*.swo
+
+# Agent/Tool Scratch Files
+.agent/skills/
+.agent/scratch/
+.agent/memory/
+!.agent/rules/

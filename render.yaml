@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: aegis-proxy-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt && python -m spacy download en_core_web_sm
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.13
+      - key: ENV
+        value: production
+      - key: HMAC_SECRET
+        generateValue: true
+      - key: MASTER_VAULT_SECRET
+        generateValue: true
+      - key: DEFAULT_TTL_SECONDS
+        value: 600
+      - key: ALLOWED_ORIGINS
+        value: http://localhost:3000
+      - key: ENABLE_ML_DETECTOR
+        value: "false"
+      - key: ADMIN_KEY_SHA256
+        sync: false
+      - key: VIEWER_KEY_SHA256
+        sync: false
