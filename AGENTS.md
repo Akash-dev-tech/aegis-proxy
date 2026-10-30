@@ -44,3 +44,9 @@
    - Hard rules: NEVER log raw prompts, PII, vault values, or API keys.
    - `/api/v1/audit` is strictly `admin`-only (`viewer` returns `403 Forbidden`).
    - Custom validation exception handlers ensure invalid request bodies containing PII are never reflected in logs or error responses.
+8. **Upstream LLM Integration (Groq Default):**
+   - Default upstream provider is Groq (`LLM_BASE_URL="https://api.groq.com/openai/v1"`, `LLM_DEFAULT_MODEL="llama-3.3-70b-versatile"`).
+   - If `LLM_API_KEY` is empty, deterministic mock fallback is used (`aegis_security.llm_mode="mock"`).
+   - System placeholder preservation hint injected server-side without mutating caller messages.
+   - Groq 429 maps to 429 with `Retry-After`; 401/403 maps to 502 Bad Gateway without leaking keys.
+   - Admin-only `GET /api/v1/llm-status` returns `{mode, model, base_host}` with zero secrets.

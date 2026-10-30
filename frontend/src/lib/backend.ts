@@ -42,6 +42,7 @@ interface ForwardOptions {
   body?: unknown;
   sessionId?: string | null;
   policy?: string | null;
+  userRole?: string | null;
 }
 
 export async function forwardToBackend({
@@ -51,6 +52,7 @@ export async function forwardToBackend({
   body,
   sessionId,
   policy,
+  userRole,
 }: ForwardOptions): Promise<NextResponse> {
   const url = `${AEGIS_BACKEND_URL}${path}`;
 
@@ -64,6 +66,9 @@ export async function forwardToBackend({
   }
   if (policy) {
     headers["X-Policy-Mode"] = policy;
+  }
+  if (userRole) {
+    headers["X-User-Role"] = userRole;
   }
 
   try {

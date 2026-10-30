@@ -77,7 +77,7 @@ class ChatCompletionMessage(BaseModel):
 class ChatCompletionRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    model: str = "gpt-4o-mini"
+    model: str = "llama-3.3-70b-versatile"
     messages: List[ChatCompletionMessage]
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
@@ -93,6 +93,7 @@ class AegisSecurityMetadata(BaseModel):
     risk_score: int
     prompt_sent_to_llm: str
     raw_llm_output: str
+    llm_mode: str = "mock"
     output_scan_passed: bool
     output_scan_findings: List[str] = Field(default_factory=list)
     restored_for_role: Optional[str] = None
@@ -126,7 +127,7 @@ class ModelItem(BaseModel):
     id: str
     object: str = "model"
     created: int = 1700000000
-    owned_by: str = "openai"
+    owned_by: str = "groq"
 
 
 class ModelListResponse(BaseModel):

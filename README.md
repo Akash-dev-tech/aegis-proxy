@@ -46,7 +46,7 @@ flowchart TD
     end
 
     subgraph External ["Upstream Provider / Fallback"]
-        LLM["Target LLM API (OpenAI / Groq / Gemini)\n(or Offline Deterministic Mock Engine)"]
+        LLM["Target LLM API (Groq LPU)\n(or Offline Deterministic Mock Engine)"]
     end
 
     SDK -->|1. POST /v1/chat/completions| AuthCheck
@@ -122,7 +122,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="gpt-4o-mini",
+    model="llama-3.3-70b-versatile",
     messages=[
         {
             "role": "user",
@@ -147,7 +147,7 @@ const client = new OpenAI({
 
 async function run() {
   const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "llama-3.3-70b-versatile",
     messages: [
       { role: "user", content: "Transfer ₹50,000 to ananya@okhdfcbank." }
     ],
@@ -221,7 +221,9 @@ Set the following environment variables in Render:
 - `ADMIN_KEY_SHA256`: *(SHA-256 hash of your admin key)*
 - `VIEWER_KEY_SHA256`: *(SHA-256 hash of your viewer key)*
 - `ALLOWED_ORIGINS`: `https://your-frontend.vercel.app`
-- `LLM_API_KEY`: *(Optional: OpenAI/Groq API key for live LLM mode)*
+- `LLM_API_KEY`: *(Optional: Groq API key for live LLM mode; default model llama-3.3-70b-versatile)*
+- `LLM_BASE_URL`: *(Default: https://api.groq.com/openai/v1)*
+- `LLM_DEFAULT_MODEL`: *(Default: llama-3.3-70b-versatile)*
 
 > **Fail-Closed Security**: When `ENV=production`, Aegis will **refuse to start** if demo key hashes or default secrets are detected.
 

@@ -1,8 +1,10 @@
 import uuid
 from typing import List, Optional
+from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, Header, Response
 from app.audit import audit_logger
 from app.auth import AuthenticatedUser, require_admin, require_user
+from app.config import settings
 from app.models import AuditEntry, MaskRequest, MaskResponse, UnmaskRequest, UnmaskResponse
 from app.pii_engine import pii_engine
 
@@ -79,3 +81,18 @@ async def get_audit_logs(
 ) -> List[AuditEntry]:
     """Retrieve ring buffer audit logs. Restricted strictly to admin role."""
     return audit_logger.get_entries()
+
+
+@router.get("/llm-status")
+async def get_llm_status(
+    user: AuthenticatedUser = Depends(require_admin),
+):
+    """Retrieve upstream LLM configuration status (admin only, zero secret leakage)."""
+    parsed = urlparse(settings.LLM_BASE_URL)
+    base_host = parsed.netloc or parsed.path
+    mode = "groq" if bool(settings.LLM_API_KEY) else "mock"
+    return {
+        "mode": mode,
+        "model": settings.LLM_DEFAULT_MODEL,
+        "base_host": base_host,
+    }

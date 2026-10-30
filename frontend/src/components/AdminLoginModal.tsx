@@ -2,18 +2,20 @@
 
 import React, { useState } from "react";
 import { Lock, X, AlertTriangle, ShieldCheck, Loader2 } from "lucide-react";
+import { useAegis } from "@/context/AegisContext";
 
 interface AdminLoginModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  onSuccess?: () => void;
 }
 
-export function AdminLoginModal({
-  isOpen,
-  onClose,
-  onSuccess,
-}: AdminLoginModalProps) {
+export function AdminLoginModal(props: AdminLoginModalProps) {
+  const aegis = useAegis();
+  const isOpen = props.isOpen !== undefined ? props.isOpen : aegis.isLoginModalOpen;
+  const onClose = props.onClose || aegis.closeLoginModal;
+  const onSuccess = props.onSuccess || aegis.checkAdminAuth;
+
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export function AdminLoginModal({
       }
 
       setPassword("");
-      onSuccess();
+      await onSuccess();
       onClose();
     } catch {
       setError("Network error: Could not reach authentication service");
@@ -49,7 +51,7 @@ export function AdminLoginModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="relative w-full max-w-md rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-2xl">
         <button
           onClick={onClose}
@@ -99,32 +101,36 @@ export function AdminLoginModal({
               required
             />
             <p className="mt-1 text-[11px] text-slate-500">
-              Default demo credential: <code className="text-cyan-400 font-mono">admin</code>
+              Default demo password: <code className="text-cyan-400">admin</code>
             </p>
           </div>
 
-          <div className="flex items-center justify-between pt-2">
-            <span className="text-[11px] text-slate-400 flex items-center gap-1">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-              HttpOnly Secure Cookie
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading || !password}
-                className="flex items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-cyan-500 disabled:opacity-50 transition-all shadow-md shadow-cyan-900/30"
-              >
-                {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Authenticate
-              </button>
+          <div className="rounded-lg bg-slate-950/60 border border-slate-800 p-3 text-xs text-slate-400 space-y-1.5">
+            <div className="flex items-center gap-1.5 font-medium text-slate-300">
+              <ShieldCheck className="h-4 w-4 text-emerald-400" />
+              <span>Zero-Trust Role Derivation</span>
             </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Logging in sets an httpOnly session cookie verified server-side. The client browser NEVER holds or accesses raw admin API keys.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg px-4 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !password}
+              className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-cyan-500/20 hover:from-cyan-400 hover:to-blue-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 transition-all"
+            >
+              {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              <span>{loading ? "Authenticating..." : "Unlock Admin Role"}</span>
+            </button>
           </div>
         </form>
       </div>

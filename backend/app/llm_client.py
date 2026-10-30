@@ -12,9 +12,20 @@ logger = logging.getLogger("aegis.llm_client")
 ALLOWED_FORWARD_FIELDS = {"model", "messages", "temperature", "max_tokens", "top_p"}
 PLACEHOLDER_REGEX = re.compile(r"<[A-Z0-9_]+_\d+>")
 
+# Server-side un-editable instruction prepended upstream to protect placeholder preservation
+SYSTEM_PLACEHOLDER_PRESERVATION_HINT = {
+    "role": "system",
+    "content": (
+        "CRITICAL INSTRUCTION: You may see privacy protection placeholders formatted like "
+        "<PERSON_1>, <IN_PAN_1>, <IN_AADHAAR_1>, <EMAIL_ADDRESS_1>, <API_KEY_1>, etc. in the prompt. "
+        "You MUST preserve and copy these placeholders exactly as written. "
+        "NEVER alter, expand, translate, or explain them."
+    ),
+}
+
 
 class LLMClient:
-    """Async client supporting simulated deterministic mock replies or real OpenAI-compatible upstream."""
+    """Async client supporting simulated deterministic mock replies or real Groq upstream."""
 
     def __init__(self, transport: Optional[httpx.AsyncBaseTransport] = None):
         self._transport = transport
@@ -25,7 +36,6 @@ class LLMClient:
 
     def _generate_mock_reply(self, messages: List[Dict[str, Any]]) -> str:
         """Deterministic mock LLM reply echoing any placeholders discovered in masked messages."""
-        # Find all placeholders in the messages text
         all_text = " ".join(
             str(m.get("content", "")) for m in messages if isinstance(m, dict)
         )
@@ -46,11 +56,11 @@ class LLMClient:
         self,
         request_payload: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Execute chat completion either via mock or upstream API."""
+        """Execute chat completion either via deterministic mock or upstream Groq API."""
         messages = request_payload.get("messages", [])
         model = request_payload.get("model") or settings.LLM_DEFAULT_MODEL
 
-        # If no LLM_API_KEY is configured and no mock transport is injected, use deterministic mock
+        # Explicit fallback: only use deterministic mock when LLM_API_KEY is empty AND no test transport injected
         if not settings.LLM_API_KEY and self._transport is None:
             reply_content = self._generate_mock_reply(messages)
             return {
@@ -73,6 +83,7 @@ class LLMClient:
                     "completion_tokens": len(reply_content) // 4,
                     "total_tokens": (len(str(messages)) + len(reply_content)) // 4,
                 },
+                "_llm_mode": "mock",
             }
 
         # Filter strictly to whitelisted fields
@@ -81,7 +92,13 @@ class LLMClient:
         }
         sanitized_payload["model"] = model
 
-        # Upstream call with timeouts, SSRF protection (env-only base URL), and 1 retry on 5xx
+        # Prepend server-side system preservation hint without mutating caller's original messages list
+        injected_messages = [dict(SYSTEM_PLACEHOLDER_PRESERVATION_HINT)] + [
+            dict(m) if isinstance(m, dict) else m for m in messages
+        ]
+        sanitized_payload["messages"] = injected_messages
+
+        # Upstream call with timeouts, SSRF protection (env-only base URL), and retry on 5xx
         base_url = settings.LLM_BASE_URL.rstrip("/")
         url = f"{base_url}/chat/completions"
         headers = {
@@ -94,6 +111,37 @@ class LLMClient:
             for attempt in range(2):  # Try once + 1 retry on 5xx
                 try:
                     response = await client.post(url, headers=headers, json=sanitized_payload)
+
+                    # 1. Groq 429 rate limit mapping
+                    if response.status_code == 429:
+                        retry_after = response.headers.get("Retry-After") or response.headers.get("retry-after")
+                        resp_headers = {"Retry-After": retry_after} if retry_after else None
+                        raise HTTPException(
+                            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail={
+                                "error": {
+                                    "message": "Upstream rate limit exceeded. Please retry later.",
+                                    "type": "rate_limit_error",
+                                    "code": "upstream_rate_limited",
+                                }
+                            },
+                            headers=resp_headers,
+                        )
+
+                    # 2. Upstream auth failure mapping (never leak LLM_API_KEY)
+                    if response.status_code in (401, 403):
+                        raise HTTPException(
+                            status_code=status.HTTP_502_BAD_GATEWAY,
+                            detail={
+                                "error": {
+                                    "message": "Upstream authentication failed with LLM provider.",
+                                    "type": "upstream_auth_error",
+                                    "code": "bad_gateway",
+                                }
+                            },
+                        )
+
+                    # 3. Upstream 5xx server errors
                     if response.status_code >= 500:
                         if attempt == 0:
                             continue  # Retry on 5xx
@@ -107,6 +155,8 @@ class LLMClient:
                                 }
                             },
                         )
+
+                    # 4. Other 4xx client errors
                     if response.status_code >= 400:
                         try:
                             err_json = response.json()
@@ -116,7 +166,11 @@ class LLMClient:
                             status_code=response.status_code,
                             detail=err_json,
                         )
-                    return response.json()
+
+                    data = response.json()
+                    data["_llm_mode"] = "groq"
+                    return data
+
                 except httpx.TimeoutException as exc:
                     last_exception = exc
                     if attempt == 0:
@@ -145,6 +199,7 @@ class LLMClient:
                             }
                         },
                     )
+
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail={"error": {"message": f"Upstream LLM error: {last_exception}", "code": "bad_gateway"}},

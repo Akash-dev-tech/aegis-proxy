@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.audit import audit_logger
 from app.auth import AuthenticatedUser, require_user
+from app.config import settings
 from app.llm_client import llm_client
 from app.models import (
     AegisSecurityMetadata,
@@ -236,6 +237,7 @@ async def chat_completions(
     )
 
     # 7. Construct OpenAI response with Aegis security metadata
+    llm_mode = raw_completion.get("_llm_mode", "mock" if not settings.LLM_API_KEY else "groq")
     security_meta = AegisSecurityMetadata(
         request_id=request_id,
         session_id=session_id,
@@ -244,6 +246,7 @@ async def chat_completions(
         risk_score=highest_risk_score,
         prompt_sent_to_llm=last_user_prompt_masked,
         raw_llm_output=raw_reply_text,
+        llm_mode=llm_mode,
         output_scan_passed=output_scan_passed,
         output_scan_findings=output_scan_findings,
         restored_for_role=restored_for_role,
@@ -255,7 +258,7 @@ async def chat_completions(
         id=raw_completion.get("id", f"chatcmpl-{request_id}"),
         object="chat.completion",
         created=raw_completion.get("created", int(time.time())),
-        model=request.model,
+        model=request.model or settings.LLM_DEFAULT_MODEL,
         choices=[
             ChatCompletionChoice(
                 index=0,
@@ -281,7 +284,7 @@ async def list_models(user: AuthenticatedUser = Depends(require_user)):
     return ModelListResponse(
         object="list",
         data=[
-            ModelItem(id="gpt-4o-mini", object="model", owned_by="openai"),
-            ModelItem(id="gpt-4o", object="model", owned_by="openai"),
+            ModelItem(id="llama-3.3-70b-versatile", object="model", owned_by="groq"),
+            ModelItem(id="llama-3.1-8b-instant", object="model", owned_by="groq"),
         ],
     )

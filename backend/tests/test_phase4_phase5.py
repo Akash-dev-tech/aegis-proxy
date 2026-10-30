@@ -292,7 +292,7 @@ def test_official_openai_sdk_integration():
     # Model listing via official SDK
     models = sdk.models.list()
     assert len(models.data) >= 1
-    assert any(m.id == "gpt-4o-mini" for m in models.data)
+    assert any(m.id == "llama-3.3-70b-versatile" for m in models.data)
 
 
 def test_proxy_audit_logging():

@@ -25,8 +25,8 @@ class Settings(BaseSettings):
 
     # LLM upstream settings (SSRF protection: only loaded from env)
     LLM_API_KEY: str = ""
-    LLM_BASE_URL: str = "https://api.openai.com/v1"
-    LLM_DEFAULT_MODEL: str = "gpt-4o-mini"
+    LLM_BASE_URL: str = "https://api.groq.com/openai/v1"
+    LLM_DEFAULT_MODEL: str = "llama-3.3-70b-versatile"
 
     # Rate limiting configuration
     RATE_LIMIT_PER_MINUTE: int = 30
