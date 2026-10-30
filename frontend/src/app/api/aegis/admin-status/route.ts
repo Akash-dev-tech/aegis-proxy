@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { resolveRoleFromRequest } from "@/lib/auth";
 
-export async function GET() {
-  const isAdmin = await isAdminAuthenticated();
+export async function GET(request: Request) {
+  const role = resolveRoleFromRequest(request);
   return NextResponse.json({
-    role: isAdmin ? "admin" : "viewer",
+    role,
   });
 }

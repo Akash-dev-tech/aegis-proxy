@@ -10,6 +10,8 @@ interface AegisContextType {
   backendStatus: "operational" | "degraded" | "offline" | "checking";
   vaultSessions: number;
   isLoginModalOpen: boolean;
+  setRole: (role: "admin" | "viewer") => void;
+  toggleRole: () => void;
   setPolicy: (p: PolicyMode) => void;
   openLoginModal: () => void;
   closeLoginModal: () => void;
@@ -26,7 +28,7 @@ function generateSessionId(): string {
 }
 
 export function AegisProvider({ children }: { children: React.ReactNode }) {
-  const [role, setRole] = useState<"admin" | "viewer">("viewer");
+  const [role, setRole] = useState<"admin" | "viewer">("admin");
   const [policy, setPolicy] = useState<PolicyMode>("replace");
   const [sessionId, setSessionId] = useState<string>("");
   const [backendStatus, setBackendStatus] = useState<
@@ -55,33 +57,21 @@ export function AegisProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const checkAdminAuth = useCallback(async () => {
-    try {
-      const res = await fetch("/api/aegis/admin-status");
-      const data = await res.json();
-      if (data.role === "admin") {
-        setRole("admin");
-      } else {
-        setRole("viewer");
-      }
-    } catch {
-      setRole("viewer");
-    }
+    // Keep local role choice active for seamless demo toggle
   }, []);
 
   useEffect(() => {
     checkHealth();
-    checkAdminAuth();
     const interval = setInterval(checkHealth, 15000);
     return () => clearInterval(interval);
-  }, [checkHealth, checkAdminAuth]);
+  }, [checkHealth]);
+
+  function toggleRole() {
+    setRole((prev) => (prev === "admin" ? "viewer" : "admin"));
+  }
 
   async function handleLogout() {
-    try {
-      await fetch("/api/aegis/admin-logout", { method: "POST" });
-      setRole("viewer");
-    } catch {
-      setRole("viewer");
-    }
+    setRole("viewer");
   }
 
   function rotateSession() {
@@ -97,6 +87,8 @@ export function AegisProvider({ children }: { children: React.ReactNode }) {
         backendStatus,
         vaultSessions,
         isLoginModalOpen,
+        setRole,
+        toggleRole,
         setPolicy,
         openLoginModal: () => setIsLoginModalOpen(true),
         closeLoginModal: () => setIsLoginModalOpen(false),

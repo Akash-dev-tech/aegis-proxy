@@ -94,15 +94,17 @@ def test_entity_types_masked():
     assert "<IN_UPI_1>" in res.json()["masked_text"]
     assert "merchant.bills@okhdfcbank" not in res.json()["masked_text"]
 
-    # 7. API_KEY
+    # 7. API_KEY / secret leak triggers blocking firewall
     res = client.post(
         "/api/v1/mask",
         headers=ADMIN_HEADERS,
         json={"text": "Here is the api key sk-1234567890abcdef1234567890 for testing"},
     )
     assert res.status_code == 200
-    assert "<API_KEY_1>" in res.json()["masked_text"]
-    assert "sk-1234567890abcdef1234567890" not in res.json()["masked_text"]
+    data = res.json()
+    assert data["action"] == "block"
+    assert data["masked_text"] == "[BLOCKED]"
+    assert "sk-1234567890abcdef1234567890" not in data["masked_text"]
 
 
 def test_session_consistency():

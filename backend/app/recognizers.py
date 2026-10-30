@@ -118,7 +118,7 @@ class ApiKeyRecognizer(PatternRecognizer):
         patterns = [
             Pattern(
                 name="api_key_pattern",
-                regex=r"\b(?:sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{36}|AIza[0-9A-Za-z\-_]{35}|AKIA[0-9A-Z]{16})\b",
+                regex=r"\b(?:sk-(?:proj-)?[a-zA-Z0-9_\-]{16,}|gsk_[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{20,}|AIza[0-9A-Za-z\-_]{35}|AKIA[0-9A-Z]{16})\b",
                 score=0.95,
             )
         ]

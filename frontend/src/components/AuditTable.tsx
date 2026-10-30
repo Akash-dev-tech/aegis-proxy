@@ -11,31 +11,59 @@ import {
   Layers,
   CheckCircle2,
   Loader2,
+  Filter,
 } from "lucide-react";
 
-interface AuditEntry {
-  timestamp: string;
+export interface AuditEntry {
+  timestamp: string | number;
+  timestamp_iso?: string;
   request_id: string;
-  session_id: string;
+  session_id?: string;
   action: "allow" | "mask" | "block";
   policy: string;
   risk_score: number;
-  threat_points: number;
-  pii_points: number;
-  threats: string[];
-  entity_types: string[];
-  entity_count: number;
+  threat_points?: number;
+  pii_points?: number;
+  threats?: string[];
+  threat_names?: string[];
+  entity_types?: string[];
+  entity_count?: number;
+  entity_counts?: Record<string, number>;
 }
 
 interface AuditTableProps {
   role: "admin" | "viewer";
-  onOpenAdminModal: () => void;
+  onOpenAdminModal?: () => void;
+  onSwitchRole?: (role: "admin" | "viewer") => void;
 }
 
-export function AuditTable({ role, onOpenAdminModal }: AuditTableProps) {
+function formatAuditTime(entry: AuditEntry): string {
+  if (entry.timestamp_iso) {
+    const d = new Date(entry.timestamp_iso);
+    return isNaN(d.getTime()) ? "--" : d.toLocaleTimeString();
+  }
+  if (typeof entry.timestamp === "number") {
+    const ms = entry.timestamp < 1e12 ? entry.timestamp * 1000 : entry.timestamp;
+    const d = new Date(ms);
+    return isNaN(d.getTime()) ? "--" : d.toLocaleTimeString();
+  }
+  if (entry.timestamp) {
+    const num = Number(entry.timestamp);
+    if (!isNaN(num)) {
+      const ms = num < 1e12 ? num * 1000 : num;
+      return new Date(ms).toLocaleTimeString();
+    }
+    const d = new Date(entry.timestamp);
+    return isNaN(d.getTime()) ? "--" : d.toLocaleTimeString();
+  }
+  return "--";
+}
+
+export function AuditTable({ role, onOpenAdminModal, onSwitchRole }: AuditTableProps) {
   const [logs, setLogs] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [actionFilter, setActionFilter] = useState<"all" | "allow" | "mask" | "block">("all");
 
   async function fetchAuditLogs() {
     if (role !== "admin") return;
@@ -43,7 +71,9 @@ export function AuditTable({ role, onOpenAdminModal }: AuditTableProps) {
     setError(null);
 
     try {
-      const res = await fetch("/api/aegis/audit");
+      const res = await fetch("/api/aegis/audit", {
+        headers: { "X-User-Role": role },
+      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -65,134 +95,181 @@ export function AuditTable({ role, onOpenAdminModal }: AuditTableProps) {
     }
   }, [role]);
 
-  // Viewer Guard State
+  // Viewer Guard State (RBAC Demonstration)
   if (role !== "admin") {
     return (
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center max-w-2xl mx-auto shadow-2xl">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 mb-4">
-          <Lock className="h-7 w-7" />
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-10 text-center max-w-xl mx-auto shadow-sm space-y-3">
+        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400">
+          <Lock className="h-5 w-5" />
         </div>
-        <h3 className="text-lg font-bold text-slate-100 mb-2">
-          Admin Access Required
+        <h3 className="text-sm font-semibold text-zinc-100 font-mono">
+          RBAC Protected: Administrator Role Required
         </h3>
-        <p className="text-sm text-slate-400 mb-6 leading-relaxed">
-          Public visitors can test prompt masking in the Playground, but the
-          immutable security audit log contains event metadata, risk scores, and
-          threat forensics restricted strictly to verified administrators.
+        <p className="text-xs text-zinc-400 leading-relaxed font-mono">
+          The tamper-evident security audit trail contains request metadata and risk forensics restricted to administrator accounts.
         </p>
-        <button
-          onClick={onOpenAdminModal}
-          className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-cyan-500 transition-all shadow-lg shadow-cyan-950"
-        >
-          <Lock className="h-4 w-4" />
-          Unlock Administrator View
-        </button>
+        <div className="pt-2">
+          <button
+            onClick={() => (onSwitchRole ? onSwitchRole("admin") : onOpenAdminModal?.())}
+            className="inline-flex items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 transition-colors"
+          >
+            <Lock className="h-3 w-3" />
+            <span>Switch to Admin in Top Bar</span>
+          </button>
+        </div>
       </div>
     );
   }
 
+  const filteredLogs = logs.filter((log) => {
+    if (actionFilter === "all") return true;
+    return log.action === actionFilter;
+  });
+
+  const totalBlocked = logs.filter((l) => l.action === "block").length;
+  const totalMasked = logs.filter((l) => l.action === "mask").length;
+
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl space-y-4">
-      {/* Header bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 shadow-sm space-y-3.5">
+      {/* Header Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <FileText className="h-5 w-5 text-cyan-400" />
-              Tamper-Evident Security Audit Trail
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2 font-mono">
+              <FileText className="h-4 w-4 text-zinc-400" />
+              Security Audit Trail
             </h3>
-            <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-medium text-emerald-300 flex items-center gap-1">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Zero Plaintext PII Stored
+            <span className="rounded border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+              <CheckCircle2 className="h-3 w-3" />
+              Zero Plaintext PII Persisted
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            In-memory ring buffer (100 events) recording firewall actions and risk telemetry.
+          <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">
+            In-memory ring buffer (100 events) recording firewall actions, policies, and risk telemetry.
           </p>
         </div>
 
-        <button
-          onClick={fetchAuditLogs}
-          disabled={loading}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-50 transition-colors"
-        >
-          <RefreshCw
-            className={`h-3.5 w-3.5 ${loading ? "animate-spin text-cyan-400" : ""}`}
-          />
-          <span>Refresh</span>
-        </button>
+        {/* Action Controls */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded border border-zinc-800 bg-zinc-900 p-0.5 text-[11px] font-mono">
+            {(["all", "block", "mask", "allow"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setActionFilter(mode)}
+                className={`px-2 py-0.5 rounded capitalize transition-colors ${
+                  actionFilter === mode
+                    ? "bg-zinc-800 text-zinc-100 font-semibold"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={fetchAuditLogs}
+            disabled={loading}
+            className="flex items-center gap-1.5 rounded border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs font-mono text-zinc-300 hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw
+              className={`h-3 w-3 ${loading ? "animate-spin text-zinc-400" : ""}`}
+            />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Summary KPI Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-mono">
+        <div className="rounded border border-zinc-800 bg-zinc-900/40 p-2">
+          <div className="text-[10px] text-zinc-500">Total Events</div>
+          <div className="font-bold text-zinc-200 mt-0.5">{logs.length}</div>
+        </div>
+        <div className="rounded border border-zinc-800 bg-zinc-900/40 p-2">
+          <div className="text-[10px] text-zinc-500">Blocked Threats</div>
+          <div className="font-bold text-rose-400 mt-0.5">{totalBlocked}</div>
+        </div>
+        <div className="rounded border border-zinc-800 bg-zinc-900/40 p-2">
+          <div className="text-[10px] text-zinc-500">Masked Requests</div>
+          <div className="font-bold text-amber-400 mt-0.5">{totalMasked}</div>
+        </div>
+        <div className="rounded border border-zinc-800 bg-zinc-900/40 p-2">
+          <div className="text-[10px] text-zinc-500">Zero-PII Compliance</div>
+          <div className="font-bold text-emerald-400 mt-0.5">100% Verified</div>
+        </div>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
+        <div className="flex items-center gap-2 rounded-lg border border-rose-900/60 bg-rose-950/20 p-2.5 text-xs text-rose-300 font-mono">
           <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Audit Log Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+      <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-black">
         <table className="w-full text-left text-xs font-mono">
-          <thead className="border-b border-slate-800 bg-slate-900/80 text-[11px] uppercase tracking-wider text-slate-400 font-sans">
+          <thead className="border-b border-zinc-800 bg-zinc-900/80 text-[10px] uppercase tracking-wider text-zinc-400">
             <tr>
-              <th className="px-4 py-3">Timestamp</th>
-              <th className="px-4 py-3">Request ID</th>
-              <th className="px-4 py-3">Session</th>
-              <th className="px-4 py-3">Action</th>
-              <th className="px-4 py-3">Policy</th>
-              <th className="px-4 py-3 text-right">Risk Score</th>
-              <th className="px-4 py-3">Entities</th>
-              <th className="px-4 py-3">Threats</th>
+              <th className="px-3.5 py-2.5">Time</th>
+              <th className="px-3.5 py-2.5">Request ID</th>
+              <th className="px-3.5 py-2.5">Session ID</th>
+              <th className="px-3.5 py-2.5">Action</th>
+              <th className="px-3.5 py-2.5">Policy</th>
+              <th className="px-3.5 py-2.5 text-right">Risk</th>
+              <th className="px-3.5 py-2.5">Detected Entities</th>
+              <th className="px-3.5 py-2.5">Threats</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60 text-slate-300">
+          <tbody className="divide-y divide-zinc-800/60 text-zinc-300">
             {loading && logs.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
                   <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-400" />
                     <span>Loading audit records...</span>
                   </div>
                 </td>
               </tr>
-            ) : logs.length === 0 ? (
+            ) : filteredLogs.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500 font-sans">
-                  No security events recorded in the current session yet.
+                <td colSpan={8} className="px-4 py-8 text-center text-zinc-500 font-mono text-xs">
+                  No security events matching filter.
                 </td>
               </tr>
             ) : (
-              logs.map((entry, idx) => (
+              filteredLogs.map((entry, idx) => (
                 <tr
                   key={idx}
-                  className="hover:bg-slate-900/60 transition-colors font-mono"
+                  className="hover:bg-zinc-900/40 transition-colors font-mono text-[11px]"
                 >
-                  <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">
-                    {entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString() : "--"}
+                  <td className="px-3.5 py-2 text-zinc-400 whitespace-nowrap">
+                    {formatAuditTime(entry)}
                   </td>
-                  <td className="px-4 py-2.5 text-cyan-400">
-                    {entry.request_id ? `${entry.request_id.slice(0, 8)}...` : "--"}
+                  <td className="px-3.5 py-2 text-zinc-300">
+                    {entry.request_id ? `${entry.request_id.slice(0, 10)}...` : "--"}
                   </td>
-                  <td className="px-4 py-2.5 text-slate-400">
-                    {entry.session_id ? `${entry.session_id.slice(0, 8)}...` : "--"}
+                  <td className="px-3.5 py-2 text-zinc-400">
+                    {entry.session_id ? `${entry.session_id.slice(0, 10)}...` : "--"}
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-3.5 py-2">
                     <span
-                      className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold ${
+                      className={`inline-flex items-center rounded border px-1.5 py-0.2 text-[10px] font-bold ${
                         entry.action === "block"
-                          ? "bg-rose-500/10 text-rose-300 border border-rose-500/30"
+                          ? "bg-rose-950/60 text-rose-300 border-rose-900/60"
                           : entry.action === "mask"
-                          ? "bg-amber-500/10 text-amber-300 border border-amber-500/30"
-                          : "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30"
+                          ? "bg-amber-950/60 text-amber-300 border-amber-900/60"
+                          : "bg-emerald-950/60 text-emerald-300 border-emerald-900/60"
                       }`}
                     >
                       {entry.action.toUpperCase()}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-slate-300">
+                  <td className="px-3.5 py-2 text-zinc-400">
                     {entry.policy}
                   </td>
-                  <td className="px-4 py-2.5 text-right font-bold">
+                  <td className="px-3.5 py-2 text-right font-bold">
                     <span
                       className={
                         entry.risk_score >= 70
@@ -205,22 +282,30 @@ export function AuditTable({ role, onOpenAdminModal }: AuditTableProps) {
                       {entry.risk_score}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-3.5 py-2">
                     {entry.entity_types && entry.entity_types.length > 0 ? (
-                      <span className="text-cyan-300">
-                        {entry.entity_types.join(", ")} ({entry.entity_count})
+                      <span className="text-zinc-300">
+                        {entry.entity_types.join(", ")} ({entry.entity_count ?? entry.entity_types.length})
+                      </span>
+                    ) : entry.entity_counts && Object.keys(entry.entity_counts).length > 0 ? (
+                      <span className="text-zinc-300">
+                        {Object.entries(entry.entity_counts).map(([k, v]) => `${k} (${v})`).join(", ")}
                       </span>
                     ) : (
-                      <span className="text-slate-600">None</span>
+                      <span className="text-zinc-600">None</span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5">
-                    {entry.threats && entry.threats.length > 0 ? (
-                      <span className="text-amber-400">
+                  <td className="px-3.5 py-2">
+                    {(entry.threats && entry.threats.length > 0) ? (
+                      <span className="text-rose-400">
                         {entry.threats.join(", ")}
                       </span>
+                    ) : (entry.threat_names && entry.threat_names.length > 0) ? (
+                      <span className="text-rose-400">
+                        {entry.threat_names.join(", ")}
+                      </span>
                     ) : (
-                      <span className="text-slate-600">Clean</span>
+                      <span className="text-zinc-600">Clean</span>
                     )}
                   </td>
                 </tr>

@@ -33,6 +33,7 @@ async def mask_endpoint(
 
     audit_logger.record(
         request_id=response.request_id,
+        session_id=effective_session_id,
         role=user.role,
         endpoint="/api/v1/mask",
         policy=response.policy_applied.value,
@@ -61,6 +62,7 @@ async def unmask_endpoint(
 
     audit_logger.record(
         request_id=f"unmask_{uuid.uuid4().hex[:8]}",
+        session_id=request.session_id,
         role=user.role,
         endpoint="/api/v1/unmask",
         policy="unmask",

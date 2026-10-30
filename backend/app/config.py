@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = ""
     LLM_BASE_URL: str = "https://api.groq.com/openai/v1"
     LLM_DEFAULT_MODEL: str = "llama-3.3-70b-versatile"
+    USE_MOCK_LLM: bool = False
 
     # Rate limiting configuration
     RATE_LIMIT_PER_MINUTE: int = 30

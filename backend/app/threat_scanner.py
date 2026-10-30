@@ -69,18 +69,27 @@ RULES: List[ThreatRule] = [
     ),
     # 3. Data Exfiltration
     ThreatRule(
+        name="sensitive_data_extraction",
+        category="data_exfiltration",
+        weight=50,
+        reason="Detected command attempting to extract internal guidelines, secrets, passwords, database records, or system instructions.",
+        pattern=re.compile(
+            r"(?i)\b(?:print|reveal|output|dump|show|repeat|display|extract|leak)\s+(?:out\s+)?(?:all\s+)?(?:your\s+)?.*?(?:internal\s+guidelines|secret\s+passwords?|configuration\s+values?|database\s+records?|user\s+database|passwords?|credentials?|initial\s+instructions?|developer\s+instructions?|verbatim)\b"
+        ),
+    ),
+    ThreatRule(
         name="http_data_exfiltration",
         category="data_exfiltration",
-        weight=40,
+        weight=50,
         reason="Detected command attempting to exfiltrate session data to an external HTTP endpoint.",
         pattern=re.compile(
-            r"(?i)\b(?:send|post|transmit|curl|fetch|wget)\s+(?:all\s+.*?\s+to\s+|data\s+to\s+|to\s+)?https?://[^\s]+"
+            r"(?i)\b(?:send|post|transmit|curl|fetch|wget)\s+(?:all\s+.*?\s+to\s+|data\s+to\s+|to\s+)?https?://\S+"
         ),
     ),
     ThreatRule(
         name="base64_encode_exfiltration",
         category="data_exfiltration",
-        weight=40,
+        weight=50,
         reason="Detected instruction attempting to base64 encode conversation history for exfiltration.",
         pattern=re.compile(
             r"(?i)\bbase64\s+(?:encode|dump|output)\s+(?:the\s+)?(?:above|previous|system|conversation)\b"
@@ -89,7 +98,7 @@ RULES: List[ThreatRule] = [
     ThreatRule(
         name="markdown_image_exfiltration",
         category="data_exfiltration",
-        weight=40,
+        weight=50,
         reason="Detected markdown image syntax commonly used for rendering-based data exfiltration.",
         pattern=re.compile(r"!\[.*?\]\(https?://[^\s\)]+\)"),
     ),
@@ -97,10 +106,10 @@ RULES: List[ThreatRule] = [
     ThreatRule(
         name="secret_key_leak",
         category="secret_leak",
-        weight=25,
+        weight=75,
         reason="Detected sensitive API key or token pattern exposed in text payload.",
         pattern=re.compile(
-            r"\b(?:sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{36}|AIza[0-9A-Za-z\-_]{35}|AKIA[0-9A-Z]{16})\b"
+            r"(?i)\b(?:sk-(?:proj-)?[a-zA-Z0-9_\-]{16,}|gsk_[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{20,}|AIza[0-9A-Za-z\-_]{35}|AKIA[0-9A-Z]{16}|(?:OPENAI_API_KEY|GROQ_API_KEY|AWS_SECRET|SECRET_KEY)\s*=\s*[a-zA-Z0-9_\-]+)\b"
         ),
     ),
 ]

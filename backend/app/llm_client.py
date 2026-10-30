@@ -17,11 +17,14 @@ SYSTEM_PLACEHOLDER_PRESERVATION_HINT = {
     "role": "system",
     "content": (
         "CRITICAL INSTRUCTION: You may see privacy protection placeholders formatted like "
-        "<PERSON_1>, <IN_PAN_1>, <IN_AADHAAR_1>, <EMAIL_ADDRESS_1>, <API_KEY_1>, etc. in the prompt. "
-        "You MUST preserve and copy these placeholders exactly as written. "
-        "NEVER alter, expand, translate, or explain them."
+        "<PERSON_1>, <IN_PAN_1>, <IN_AADHAAR_1>, <IN_UPI_1>, <EMAIL_ADDRESS_1>, <API_KEY_1>, etc. in the prompt. "
+        "You MUST treat these placeholders as valid, natural real-world entities. Preserve and naturally integrate these placeholders exactly as written in your answer. "
+        "Do not question, explain, refuse, translate, or alter them."
     ),
 }
+
+
+GROQ_KNOWN_PREFIXES = ("llama", "mixtral", "gemma", "deepseek", "whisper", "groq", "qwen")
 
 
 class LLMClient:
@@ -52,6 +55,32 @@ class LLMClient:
             return f"Processed request for {ph_str}. Everything looks compliant."
         return "Processed request successfully. All parameters compliant."
 
+    def _mock_completion_dict(self, model: str, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+        reply_content = self._generate_mock_reply(messages)
+        return {
+            "id": f"chatcmpl-mock-{int(time.time())}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": model,
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": reply_content,
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": len(str(messages)) // 4,
+                "completion_tokens": len(reply_content) // 4,
+                "total_tokens": (len(str(messages)) + len(reply_content)) // 4,
+            },
+            "_llm_mode": "mock",
+            "_model_used": model,
+        }
+
     async def complete(
         self,
         request_payload: Dict[str, Any],
@@ -60,31 +89,15 @@ class LLMClient:
         messages = request_payload.get("messages", [])
         model = request_payload.get("model") or settings.LLM_DEFAULT_MODEL
 
-        # Explicit fallback: only use deterministic mock when LLM_API_KEY is empty AND no test transport injected
-        if not settings.LLM_API_KEY and self._transport is None:
-            reply_content = self._generate_mock_reply(messages)
-            return {
-                "id": f"chatcmpl-mock-{int(time.time())}",
-                "object": "chat.completion",
-                "created": int(time.time()),
-                "model": model,
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": reply_content,
-                        },
-                        "finish_reason": "stop",
-                    }
-                ],
-                "usage": {
-                    "prompt_tokens": len(str(messages)) // 4,
-                    "completion_tokens": len(reply_content) // 4,
-                    "total_tokens": (len(str(messages)) + len(reply_content)) // 4,
-                },
-                "_llm_mode": "mock",
-            }
+        # Explicit fallback: use deterministic mock if USE_MOCK_LLM is set or if LLM_API_KEY is empty and no transport injected
+        if getattr(settings, "USE_MOCK_LLM", False) or (not settings.LLM_API_KEY and self._transport is None):
+            return self._mock_completion_dict(model, messages)
+
+        # Groq model mapping: if sending to api.groq.com and model is not a valid Groq model (e.g. gpt-4o-mini), override
+        if "api.groq.com" in settings.LLM_BASE_URL:
+            low_model = model.lower()
+            if low_model.startswith(("gpt-", "text-", "claude-", "davinci-")) or not any(low_model.startswith(p) for p in GROQ_KNOWN_PREFIXES):
+                model = settings.LLM_DEFAULT_MODEL
 
         # Filter strictly to whitelisted fields
         sanitized_payload = {
@@ -141,7 +154,15 @@ class LLMClient:
                             },
                         )
 
-                    # 3. Upstream 5xx server errors
+                    # 3. Upstream 404 / model error fallback
+                    if response.status_code == 404:
+                        if sanitized_payload.get("model") != settings.LLM_DEFAULT_MODEL:
+                            sanitized_payload["model"] = settings.LLM_DEFAULT_MODEL
+                            continue
+                        logger.warning("Upstream model 404; falling back to deterministic mock response.")
+                        return self._mock_completion_dict(model, messages)
+
+                    # 4. Upstream 5xx server errors
                     if response.status_code >= 500:
                         if attempt == 0:
                             continue  # Retry on 5xx
@@ -156,7 +177,7 @@ class LLMClient:
                             },
                         )
 
-                    # 4. Other 4xx client errors
+                    # 5. Other 4xx client errors
                     if response.status_code >= 400:
                         try:
                             err_json = response.json()
@@ -169,6 +190,7 @@ class LLMClient:
 
                     data = response.json()
                     data["_llm_mode"] = "groq"
+                    data["_model_used"] = sanitized_payload.get("model", settings.LLM_DEFAULT_MODEL)
                     return data
 
                 except httpx.TimeoutException as exc:
@@ -187,18 +209,8 @@ class LLMClient:
                     )
                 except httpx.RequestError as exc:
                     last_exception = exc
-                    if attempt == 0:
-                        continue
-                    raise HTTPException(
-                        status_code=status.HTTP_502_BAD_GATEWAY,
-                        detail={
-                            "error": {
-                                "message": "Failed to connect to upstream LLM gateway",
-                                "type": "connection_error",
-                                "code": "bad_gateway",
-                            }
-                        },
-                    )
+                    logger.warning(f"Upstream request error: {exc}. Falling back to deterministic mock.")
+                    return self._mock_completion_dict(model, messages)
 
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,

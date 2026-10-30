@@ -1,29 +1,33 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  Plug,
   Terminal,
   Copy,
   Check,
-  Server,
-  Key,
-  ShieldAlert,
-  AlertTriangle,
   Play,
   Loader2,
   CheckCircle2,
   XCircle,
   HelpCircle,
   FileCode,
+  Zap,
 } from "lucide-react";
 
 export default function ConnectPage() {
   const [activeTab, setActiveTab] = useState<"python" | "node" | "curl" | "langchain" | "http">("python");
   const [copied, setCopied] = useState(false);
+  const [proxyBaseUrl, setProxyBaseUrl] = useState("http://localhost:8000/v1");
+
+  // Dynamic base URL detection
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setProxyBaseUrl(`${window.location.origin}/v1`);
+    }
+  }, []);
 
   // Interactive Connection Test State
-  const [testEndpoint, setTestEndpoint] = useState<"health" | "models">("health");
+  const [testEndpoint, setTestEndpoint] = useState<"chat" | "mask" | "health" | "models">("chat");
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [testResponse, setTestResponse] = useState<string | null>(null);
   const [testLatency, setTestLatency] = useState<number | null>(null);
@@ -33,7 +37,7 @@ export default function ConnectPage() {
 
 # 1. Point standard OpenAI SDK to Aegis Proxy
 client = OpenAI(
-    base_url="http://localhost:8000/v1",       # Or your deployed Render URL
+    base_url="${proxyBaseUrl}",       # Or your deployed Render URL
     api_key="YOUR_AEGIS_KEY",                 # demo-admin-key or demo-viewer-key
     default_headers={
         "X-Session-Id": "sess_analytics_42",  # Keeps PII consistent across turns
@@ -62,7 +66,7 @@ print("Risk Score:", sec_meta.get("risk_score"))`,
 
 // 1. Initialize OpenAI client with Aegis Proxy endpoint
 const client = new OpenAI({
-  baseURL: "http://localhost:8000/v1",
+  baseURL: "${proxyBaseUrl}",
   apiKey: process.env.AEGIS_API_KEY || "YOUR_AEGIS_KEY",
   defaultHeaders: {
     "X-Session-Id": "sess_node_production_99",
@@ -77,7 +81,7 @@ async function main() {
     messages: [
       { role: "user", content: "Transfer 5000 INR to UPI rahul@oksbi for Rahul Sharma" }
     ],
-    stream: false, // Streaming is rejected (400) to ensure full PII verification
+    stream: false, // Streaming rejected (400) to ensure full PII verification
   });
 
   console.log("Safe Assistant Reply:", completion.choices[0]?.message?.content);
@@ -86,7 +90,7 @@ async function main() {
 main();`,
 
     curl: `# 1. Direct OpenAI-Compatible Chat Completion via Aegis Firewall
-curl -X POST http://localhost:8000/v1/chat/completions \\
+curl -X POST ${proxyBaseUrl}/chat/completions \\
   -H "Authorization: Bearer YOUR_AEGIS_KEY" \\
   -H "Content-Type: application/json" \\
   -H "X-Session-Id: my-cli-session-123" \\
@@ -100,7 +104,7 @@ curl -X POST http://localhost:8000/v1/chat/completions \\
   }'
 
 # 2. Standalone PII Masking Endpoint
-curl -X POST http://localhost:8000/api/v1/mask \\
+curl -X POST ${proxyBaseUrl.replace('/v1', '')}/api/v1/mask \\
   -H "X-API-Key: YOUR_AEGIS_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -109,14 +113,14 @@ curl -X POST http://localhost:8000/api/v1/mask \\
   }'
 
 # 3. Upstream LLM Health Status (Admin Key Required)
-curl -X GET http://localhost:8000/api/v1/llm-status \\
+curl -X GET ${proxyBaseUrl.replace('/v1', '')}/api/v1/llm-status \\
   -H "X-API-Key: YOUR_ADMIN_KEY"`,
 
     langchain: `from langchain_openai import ChatOpenAI
 
 # Drop-in replacement for LangChain ChatOpenAI
 llm = ChatOpenAI(
-    base_url="http://localhost:8000/v1",
+    base_url="${proxyBaseUrl}",
     api_key="YOUR_AEGIS_KEY",
     model="llama-3.3-70b-versatile",
     default_headers={
@@ -131,7 +135,7 @@ response = llm.invoke("Summarize credit report for Rahul Sharma (PAN: ABCDE1234F
 print(response.content)`,
 
     http: `POST /v1/chat/completions HTTP/1.1
-Host: localhost:8000
+Host: ${proxyBaseUrl.replace(/https?:\/\//, '').replace(/\/v1$/, '')}
 Authorization: Bearer YOUR_AEGIS_KEY
 Content-Type: application/json
 X-Session-Id: custom-app-session-01
@@ -162,8 +166,37 @@ X-Policy-Mode: replace
     const start = performance.now();
 
     try {
-      const url = testEndpoint === "health" ? "/api/aegis/health" : "/api/aegis/models";
-      const res = await fetch(url);
+      let res: Response;
+      if (testEndpoint === "chat") {
+        res = await fetch("/api/aegis/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: "user",
+                content:
+                  "Verify KYC for Rahul Sharma (PAN: ABCDE1234F, Aadhaar: 4123 4567 8901). Disbursing funds to rahul@oksbi.",
+              },
+            ],
+            policy: "replace",
+          }),
+        });
+      } else if (testEndpoint === "mask") {
+        res = await fetch("/api/aegis/mask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: "Customer Rahul Sharma with PAN ABCDE1234F transferred funds to rahul@oksbi. Phone: +91 9876543210",
+            policy: "replace",
+          }),
+        });
+      } else if (testEndpoint === "models") {
+        res = await fetch("/api/aegis/models");
+      } else {
+        res = await fetch("/api/aegis/health");
+      }
+
       const elapsed = Math.round(performance.now() - start);
       setTestLatency(elapsed);
 
@@ -182,201 +215,226 @@ X-Policy-Mode: replace
   }
 
   return (
-    <div className="space-y-12 py-2 animate-in fade-in duration-300">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="space-y-2 border-b border-slate-800/80 pb-4">
-        <div className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-0.5 text-xs font-semibold text-cyan-400">
-          <Plug className="h-3.5 w-3.5" />
-          <span>Quickstart Integration</span>
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">
-          Connect Your App in 2 Lines
+      <div className="border-b border-zinc-800 pb-3">
+        <h1 className="text-base font-bold tracking-tight text-zinc-100 flex items-center gap-2">
+          <Terminal className="h-4 w-4 text-zinc-400" />
+          Developer Quickstart & SDK Integration
         </h1>
-        <p className="text-sm text-slate-300 max-w-2xl">
-          Aegis Proxy implements the OpenAI API wire specification. Replace your client <code className="text-cyan-400">base_url</code> and pass your Aegis key to gain instant PII pseudonymization and threat protection.
+        <p className="text-xs text-zinc-400 mt-0.5">
+          Aegis implements the standard OpenAI wire specification. Change <code className="text-zinc-300 font-mono">base_url</code> to route requests through the threat firewall.
         </p>
       </div>
 
-      {/* 2-Step Setup Walkthrough */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-3">
-          <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500/20 text-xs font-mono">1</span>
-            <span>Choose Your API Key Role</span>
+      {/* 2-Step Integration Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5 space-y-2">
+          <div className="flex items-center gap-1.5 font-bold text-zinc-200">
+            <span className="flex h-4 w-4 items-center justify-center rounded bg-zinc-800 text-[10px] text-zinc-400">1</span>
+            <span>API Key & Roles</span>
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Your role is derived server-side from your API key. External clients should use <code className="text-cyan-300">demo-viewer-key</code> to only see masked placeholders. Internal services use <code className="text-cyan-300">demo-admin-key</code> for full reversible unmasking.
+          <p className="text-[11px] text-zinc-400 leading-relaxed font-sans">
+            Caller role is derived server-side from the API key. External clients use <code className="text-zinc-300">demo-viewer-key</code> (safe masked tokens). Internal services use <code className="text-zinc-300">demo-admin-key</code> for reversible decryption.
           </p>
-          <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] text-slate-400 space-y-1">
-            <div><span className="text-emerald-400">Admin Key:</span> demo-admin-key (Reversible unmasking)</div>
-            <div><span className="text-cyan-400">Viewer Key:</span> demo-viewer-key (Zero PII revealed)</div>
+          <div className="rounded border border-zinc-800/80 bg-zinc-900/60 p-2 text-[10px] text-zinc-400 space-y-0.5">
+            <div><span className="text-emerald-400 font-bold">Admin:</span> demo-admin-key (Reversible unmasking)</div>
+            <div><span className="text-zinc-300 font-bold">Viewer:</span> demo-viewer-key (Zero PII revealed)</div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-3">
-          <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500/20 text-xs font-mono">2</span>
-            <span>Set Proxy Base URL</span>
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5 space-y-2">
+          <div className="flex items-center gap-1.5 font-bold text-zinc-200">
+            <span className="flex h-4 w-4 items-center justify-center rounded bg-zinc-800 text-[10px] text-zinc-400">2</span>
+            <span>Configure Base URL</span>
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Configure your client's OpenAI SDK <code className="text-cyan-300">base_url</code> to point to your Aegis instance. All chat completions sent to <code className="text-cyan-300">/v1/chat/completions</code> are transparently sanitized and forwarded to Groq.
+          <p className="text-[11px] text-zinc-400 leading-relaxed font-sans">
+            Set client SDK <code className="text-zinc-300">base_url</code> to your Aegis proxy endpoint. Standard chat requests to <code className="text-zinc-300">/v1/chat/completions</code> are sanitized and forwarded to Groq.
           </p>
-          <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] text-slate-400 space-y-1">
-            <div><span className="text-slate-500">Localhost:</span> http://localhost:8000/v1</div>
-            <div><span className="text-slate-500">Render Free Tier:</span> https://your-aegis-app.onrender.com/v1</div>
+          <div className="rounded border border-zinc-800/80 bg-zinc-900/60 p-2 text-[10px] text-zinc-400 space-y-0.5">
+            <div><span className="text-zinc-300 font-bold">Detected Host:</span> {proxyBaseUrl}</div>
+            <div><span className="text-zinc-500 font-bold">Local URL:</span> http://localhost:8000/v1</div>
           </div>
         </div>
       </div>
 
       {/* Code Snippets Section */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2.5">
           <div className="flex items-center gap-2">
-            <Terminal className="h-4 w-4 text-cyan-400" />
-            <h3 className="text-sm font-semibold text-white">SDK Code Examples</h3>
+            <Terminal className="h-4 w-4 text-zinc-400" />
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-200">
+              SDK Integration Snippets
+            </h3>
           </div>
 
           {/* Language Tabs */}
-          <div className="flex items-center gap-1 rounded-xl bg-slate-950 p-1 border border-slate-800">
+          <div className="flex items-center gap-1 rounded border border-zinc-800 bg-zinc-900 p-0.5 font-mono text-xs">
             {(["python", "node", "curl", "langchain", "http"] as const).map((lang) => (
               <button
                 key={lang}
                 onClick={() => setActiveTab(lang)}
-                className={`rounded-lg px-3 py-1 text-xs font-medium transition-all capitalize ${
+                className={`rounded px-2.5 py-0.5 text-[11px] font-medium transition-colors capitalize ${
                   activeTab === lang
-                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
-                    : "text-slate-400 hover:text-slate-200"
+                    ? "bg-zinc-800 text-zinc-100 font-semibold"
+                    : "text-zinc-500 hover:text-zinc-300"
                 }`}
               >
-                {lang === "node" ? "TypeScript / Node" : lang}
+                {lang === "node" ? "Node / TS" : lang}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Code Box with Copy Button */}
-        <div className="relative rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs overflow-x-auto shadow-inner">
+        {/* Code Box */}
+        <div className="relative rounded-lg border border-zinc-800 bg-black p-3.5 font-mono text-xs overflow-x-auto">
           <button
             onClick={handleCopy}
-            className="absolute right-3 top-3 flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/90 px-2.5 py-1 text-[11px] text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300 transition-all"
+            className="absolute right-3 top-3 flex items-center gap-1 rounded border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] text-zinc-300 hover:bg-zinc-800 transition-colors"
           >
             {copied ? (
-              <Check className="h-3.5 w-3.5 text-emerald-400" />
+              <Check className="h-3 w-3 text-emerald-400" />
             ) : (
-              <Copy className="h-3.5 w-3.5" />
+              <Copy className="h-3 w-3 text-zinc-400" />
             )}
-            <span>{copied ? "Copied" : "Copy Code"}</span>
+            <span>{copied ? "Copied" : "Copy"}</span>
           </button>
-          <pre className="text-slate-200 whitespace-pre leading-relaxed font-mono">
+          <pre className="text-zinc-300 whitespace-pre leading-relaxed text-[11px]">
             {snippets[activeTab]}
           </pre>
         </div>
       </div>
 
-      {/* Interactive Connection Tester Widget */}
-      <div className="rounded-2xl border border-cyan-500/30 bg-slate-900/80 p-6 shadow-xl space-y-4">
-        <div className="flex items-center justify-between">
+      {/* Interactive Live Endpoint Tester */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-3">
+        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2.5">
           <div className="flex items-center gap-2">
-            <Play className="h-4 w-4 text-cyan-400" />
-            <h3 className="text-sm font-semibold text-white">
-              Test Connection & Upstream Verification
+            <Play className="h-4 w-4 text-zinc-400" />
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-200">
+              Test Developer Endpoint Live
             </h3>
           </div>
-          <span className="text-xs text-slate-400">
-            Test backend connectivity right from your browser
+          <span className="text-[11px] font-mono text-zinc-500">
+            Verify response headers & aegis_security metadata
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-          <div className="md:col-span-5 flex items-center gap-2">
-            <label className="text-xs text-slate-400 whitespace-nowrap">Endpoint:</label>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center font-mono text-xs">
+          <div className="md:col-span-8 flex items-center gap-2">
+            <label className="text-[11px] text-zinc-500 whitespace-nowrap">Endpoint:</label>
             <select
               value={testEndpoint}
-              onChange={(e) => setTestEndpoint(e.target.value as "health" | "models")}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none"
+              onChange={(e) =>
+                setTestEndpoint(
+                  e.target.value as "chat" | "mask" | "health" | "models"
+                )
+              }
+              className="w-full rounded border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-200 focus:border-zinc-600 focus:outline-none"
             >
-              <option value="health">GET /health (Backend Liveness & Vault Sessions)</option>
-              <option value="models">GET /v1/models (Upstream Model Roster)</option>
+              <option value="chat">
+                POST /v1/chat/completions (Live Groq Completion + PII Guard)
+              </option>
+              <option value="mask">
+                POST /api/v1/mask (Standalone Presidio Masking Engine)
+              </option>
+              <option value="health">
+                GET /health (Backend Status & Vault Sessions)
+              </option>
+              <option value="models">
+                GET /v1/models (Upstream Model Roster)
+              </option>
             </select>
           </div>
 
-          <div className="md:col-span-7 flex items-center justify-end gap-3">
+          <div className="md:col-span-4 flex items-center justify-end">
             <button
               onClick={runConnectionTest}
               disabled={testStatus === "testing"}
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2 text-xs font-semibold text-white hover:from-cyan-400 hover:to-blue-500 disabled:opacity-50 transition-all shadow-md shadow-cyan-950"
+              className="w-full sm:w-auto flex items-center justify-center gap-1.5 rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:bg-zinc-700 disabled:opacity-50 transition-colors"
             >
               {testStatus === "testing" ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-3 w-3 animate-spin text-zinc-400" />
               ) : (
-                <Play className="h-3.5 w-3.5" />
+                <Zap className="h-3 w-3 text-zinc-400" />
               )}
-              <span>Run Live Connection Ping</span>
+              <span>Run Live Test</span>
             </button>
           </div>
         </div>
 
         {testStatus !== "idle" && (
-          <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs space-y-2">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2 text-[11px]">
-              <div className="flex items-center gap-2">
+          <div className="rounded-lg border border-zinc-800 bg-black p-3 font-mono text-xs space-y-2">
+            <div className="flex items-center justify-between border-b border-zinc-800/80 pb-1.5 text-[11px]">
+              <div className="flex items-center gap-1.5">
                 {testStatus === "success" ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                 ) : testStatus === "error" ? (
-                  <XCircle className="h-4 w-4 text-rose-400" />
+                  <XCircle className="h-3.5 w-3.5 text-rose-400" />
                 ) : (
-                  <Loader2 className="h-4 w-4 text-cyan-400 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 text-zinc-400 animate-spin" />
                 )}
-                <span className={testStatus === "success" ? "text-emerald-300 font-semibold" : "text-rose-300 font-semibold"}>
-                  {testStatus === "success" ? "Connection Successful (200 OK)" : testStatus === "error" ? "Connection Failed" : "Testing..."}
+                <span
+                  className={
+                    testStatus === "success"
+                      ? "text-emerald-400 font-semibold"
+                      : "text-rose-400 font-semibold"
+                  }
+                >
+                  {testStatus === "success"
+                    ? "200 OK — Execution Succeeded"
+                    : testStatus === "error"
+                    ? "Request Failed"
+                    : "Executing..."}
                 </span>
               </div>
               {testLatency !== null && (
-                <span className="text-slate-400">Response Time: {testLatency}ms</span>
+                <span className="text-zinc-500 text-[10px]">
+                  Latency: {testLatency}ms
+                </span>
               )}
             </div>
-            <pre className="text-cyan-300/90 overflow-x-auto whitespace-pre max-h-48">
+            <pre className="text-zinc-300 overflow-x-auto whitespace-pre max-h-56 leading-relaxed text-[11px]">
               {testResponse || "Awaiting response..."}
             </pre>
           </div>
         )}
       </div>
 
-      {/* Custom Headers Reference Table */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
-        <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-          <FileCode className="h-4 w-4 text-cyan-400" />
-          Custom HTTP Request Headers
+      {/* Custom Request Headers Table */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-3">
+        <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-200 flex items-center gap-2">
+          <FileCode className="h-4 w-4 text-zinc-400" />
+          Custom Request Headers
         </h3>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-xs font-mono border-collapse">
             <thead>
-              <tr className="border-b border-slate-800 text-slate-400 font-mono">
-                <th className="py-2.5 px-3">Header Name</th>
-                <th className="py-2.5 px-3">Allowed Values</th>
-                <th className="py-2.5 px-3">Behavior & Enforcement</th>
+              <tr className="border-b border-zinc-800 text-zinc-500 text-[10px] uppercase">
+                <th className="py-2 px-3">Header Name</th>
+                <th className="py-2 px-3">Allowed Values</th>
+                <th className="py-2 px-3">Behavior & Enforcement</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 text-slate-300 font-mono">
+            <tbody className="divide-y divide-zinc-800/60 text-zinc-300 text-[11px]">
               <tr>
-                <td className="py-2.5 px-3 text-cyan-300 font-bold">X-Session-Id</td>
-                <td className="py-2.5 px-3 text-slate-400">Arbitrary string (e.g. sess_abc123)</td>
-                <td className="py-2.5 px-3 font-sans text-xs">
-                  Groups requests into an isolated cryptographic vault. Within a session, the exact same raw PII always maps to the same placeholder (<code className="text-cyan-400">&lt;PERSON_1&gt;</code>).
+                <td className="py-2 px-3 font-bold text-zinc-200">X-Session-Id</td>
+                <td className="py-2 px-3 text-zinc-400">string (e.g. sess_abc123)</td>
+                <td className="py-2 px-3 text-zinc-400 font-sans">
+                  Isolates in-memory vault. Within a session, the exact same raw PII always maps to the same placeholder (<code className="text-zinc-300 font-mono">&lt;PERSON_1&gt;</code>).
                 </td>
               </tr>
               <tr>
-                <td className="py-2.5 px-3 text-cyan-300 font-bold">X-User-Role</td>
-                <td className="py-2.5 px-3 text-slate-400">viewer | admin</td>
-                <td className="py-2.5 px-3 font-sans text-xs">
-                  <strong>Downgrade Only:</strong> An admin key passing <code className="text-cyan-400">viewer</code> operates in viewer mode. A viewer key passing <code className="text-rose-400">admin</code> is ignored and stays viewer.
+                <td className="py-2 px-3 font-bold text-zinc-200">X-User-Role</td>
+                <td className="py-2 px-3 text-zinc-400">viewer | admin</td>
+                <td className="py-2 px-3 text-zinc-400 font-sans">
+                  <strong>Downgrade Only:</strong> An admin key passing <code className="text-zinc-300 font-mono">viewer</code> operates in viewer mode. A viewer key passing admin stays viewer.
                 </td>
               </tr>
               <tr>
-                <td className="py-2.5 px-3 text-cyan-300 font-bold">X-Policy-Mode</td>
-                <td className="py-2.5 px-3 text-slate-400">replace | redact | hash | block</td>
-                <td className="py-2.5 px-3 font-sans text-xs">
-                  Controls PII replacement strategy: <code className="text-cyan-400">replace</code> (reversible Fernet vault), <code className="text-cyan-400">redact</code> ([REDACTED]), <code className="text-cyan-400">hash</code> (HMAC-SHA256), or <code className="text-cyan-400">block</code> (firewall drop).
+                <td className="py-2 px-3 font-bold text-zinc-200">X-Policy-Mode</td>
+                <td className="py-2 px-3 text-zinc-400">replace | redact | hash | block</td>
+                <td className="py-2 px-3 text-zinc-400 font-sans">
+                  Controls strategy: <code className="text-zinc-300 font-mono">replace</code> (reversible Fernet vault), <code className="text-zinc-300 font-mono">redact</code> ([REDACTED]), <code className="text-zinc-300 font-mono">hash</code> (HMAC), or <code className="text-zinc-300 font-mono">block</code> (firewall drop).
                 </td>
               </tr>
             </tbody>
@@ -384,72 +442,59 @@ X-Policy-Mode: replace
         </div>
       </div>
 
-      {/* Behavior & Error Codes Reference Table */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
-        <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-          <HelpCircle className="h-4 w-4 text-cyan-400" />
+      {/* HTTP Error Codes Table */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-3">
+        <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-200 flex items-center gap-2">
+          <HelpCircle className="h-4 w-4 text-zinc-400" />
           HTTP Status Codes & Firewall Error Formats
         </h3>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-xs font-mono border-collapse">
             <thead>
-              <tr className="border-b border-slate-800 text-slate-400 font-mono">
-                <th className="py-2.5 px-3">Status Code</th>
-                <th className="py-2.5 px-3">Error Type</th>
-                <th className="py-2.5 px-3">Trigger Condition & Mitigation</th>
+              <tr className="border-b border-zinc-800 text-zinc-500 text-[10px] uppercase">
+                <th className="py-2 px-3">Status</th>
+                <th className="py-2 px-3">Error Code</th>
+                <th className="py-2 px-3">Trigger Condition & Mitigation</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 text-slate-300 font-mono">
+            <tbody className="divide-y divide-zinc-800/60 text-zinc-300 text-[11px]">
               <tr>
-                <td className="py-2.5 px-3 text-emerald-400 font-bold">200 OK</td>
-                <td className="py-2.5 px-3 text-slate-400">Success</td>
-                <td className="py-2.5 px-3 font-sans text-xs">
-                  OpenAI Chat Completion format with appended <code className="text-cyan-400">aegis_security</code> payload containing risk score, detected entities, and threat metadata.
+                <td className="py-2 px-3 font-bold text-emerald-400">200 OK</td>
+                <td className="py-2 px-3 text-zinc-400">success</td>
+                <td className="py-2 px-3 text-zinc-400 font-sans">
+                  OpenAI Chat Completion format with appended <code className="text-zinc-300 font-mono">aegis_security</code> payload containing risk score, detected entities, and threat metadata.
                 </td>
               </tr>
               <tr>
-                <td className="py-2.5 px-3 text-amber-400 font-bold">400 Bad Request</td>
-                <td className="py-2.5 px-3 text-slate-400">stream_unsupported</td>
-                <td className="py-2.5 px-3 font-sans text-xs">
-                  Triggered when <code className="text-amber-300">&quot;stream&quot;: true</code> is passed. Aegis rejects streaming because full-buffer PII scanning and leak redaction require the complete payload.
+                <td className="py-2 px-3 font-bold text-amber-400">400 Bad Request</td>
+                <td className="py-2 px-3 text-zinc-400">stream_unsupported</td>
+                <td className="py-2 px-3 text-zinc-400 font-sans">
+                  Triggered when <code className="text-zinc-300 font-mono">&quot;stream&quot;: true</code> is passed. Streaming is rejected because full-buffer PII scanning requires complete payload.
                 </td>
               </tr>
               <tr>
-                <td className="py-2.5 px-3 text-rose-400 font-bold">400 Bad Request</td>
-                <td className="py-2.5 px-3 text-slate-400">content_policy_violation</td>
-                <td className="py-2.5 px-3 font-sans text-xs">
-                  Firewall dropped prompt: Risk score &ge; 70 or threat score &ge; 45 (e.g. prompt injection, secret leak). Zero text dispatched upstream.
+                <td className="py-2 px-3 font-bold text-rose-400">403 Forbidden</td>
+                <td className="py-2 px-3 text-zinc-400">content_policy_violation</td>
+                <td className="py-2 px-3 text-zinc-400 font-sans">
+                  Firewall dropped prompt: Threat score &ge; 40 (prompt injection, jailbreak, data exfiltration, secret leak). Zero text dispatched upstream.
                 </td>
               </tr>
               <tr>
-                <td className="py-2.5 px-3 text-amber-400 font-bold">429 Too Many Requests</td>
-                <td className="py-2.5 px-3 text-slate-400">rate_limit_exceeded</td>
-                <td className="py-2.5 px-3 font-sans text-xs">
-                  Client exceeded sliding-window rate limit (default: 30 requests/minute per key). Response includes standard <code className="text-cyan-400">Retry-After</code> header.
+                <td className="py-2 px-3 font-bold text-amber-400">429 Rate Limit</td>
+                <td className="py-2 px-3 text-zinc-400">rate_limit_exceeded</td>
+                <td className="py-2 px-3 text-zinc-400 font-sans">
+                  Client exceeded sliding-window rate limit (default: 30 req/min per key). Response includes standard <code className="text-zinc-300 font-mono">Retry-After</code> header.
                 </td>
               </tr>
               <tr>
-                <td className="py-2.5 px-3 text-rose-400 font-bold">502 Bad Gateway</td>
-                <td className="py-2.5 px-3 text-slate-400">upstream_auth_error</td>
-                <td className="py-2.5 px-3 font-sans text-xs">
+                <td className="py-2 px-3 font-bold text-rose-400">502 Bad Gateway</td>
+                <td className="py-2 px-3 text-zinc-400">upstream_auth_error</td>
+                <td className="py-2 px-3 text-zinc-400 font-sans">
                   Upstream Groq authentication failed or upstream returned 5xx. Sanitized error response returns without leaking server keys.
                 </td>
               </tr>
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Security Warning Notice */}
-      <div className="rounded-2xl border border-rose-500/30 bg-rose-950/20 p-5 flex items-start gap-3">
-        <ShieldAlert className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
-        <div className="space-y-1 text-xs">
-          <div className="font-semibold text-rose-300">
-            Mandatory Client Security Rule
-          </div>
-          <p className="text-slate-300 leading-relaxed">
-            NEVER embed <code className="text-rose-400 font-mono">demo-admin-key</code> in client-side browser bundles, public single-page apps, or mobile packages. Public clients must only connect through server-side route handlers or hold low-privilege <code className="text-cyan-400 font-mono">demo-viewer-key</code> credentials.
-          </p>
         </div>
       </div>
     </div>

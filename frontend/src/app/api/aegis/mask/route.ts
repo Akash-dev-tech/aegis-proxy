@@ -30,8 +30,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const auth = await getAuthContext();
-    const requestedRole = rawBody?.role || request.headers.get("x-user-role");
+    const auth = await getAuthContext(request, rawBody);
 
     return await forwardToBackend({
       path: "/api/v1/mask",
@@ -44,7 +43,7 @@ export async function POST(request: Request) {
       },
       sessionId: parsed.data.session_id,
       policy: parsed.data.policy,
-      userRole: requestedRole,
+      userRole: auth.role,
     });
   } catch {
     return NextResponse.json(

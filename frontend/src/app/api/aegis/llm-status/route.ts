@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthenticated, AEGIS_ADMIN_KEY } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { forwardToBackend, checkRouteRateLimit, getClientIp } from "@/lib/backend";
 
 export async function GET(request: Request) {
@@ -11,17 +11,12 @@ export async function GET(request: Request) {
     );
   }
 
-  const authenticated = await isAdminAuthenticated();
-  if (!authenticated) {
-    return NextResponse.json(
-      { error: "Admin role required to inspect LLM status" },
-      { status: 403 }
-    );
-  }
+  const auth = await getAuthContext(request);
 
   return await forwardToBackend({
     path: "/api/v1/llm-status",
     method: "GET",
-    apiKey: AEGIS_ADMIN_KEY,
+    apiKey: auth.apiKey,
+    userRole: auth.role,
   });
 }

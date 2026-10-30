@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AEGIS_ADMIN_KEY, isAdminAuthenticated } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import {
   checkRouteRateLimit,
   forwardToBackend,
@@ -15,20 +15,12 @@ export async function GET(request: Request) {
     );
   }
 
-  const isAdmin = await isAdminAuthenticated();
-  if (!isAdmin) {
-    return NextResponse.json(
-      {
-        error:
-          "Admin role required to view security audit logs. Public viewer cannot access audit history.",
-      },
-      { status: 403 }
-    );
-  }
+  const auth = await getAuthContext(request);
 
   return await forwardToBackend({
     path: "/api/v1/audit",
     method: "GET",
-    apiKey: AEGIS_ADMIN_KEY,
+    apiKey: auth.apiKey,
+    userRole: auth.role,
   });
 }

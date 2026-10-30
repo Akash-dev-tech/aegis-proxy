@@ -38,6 +38,8 @@ class MaskResponse(BaseModel):
     action: str  # "allow", "mask", "block"
     policy_applied: PolicyMode
     risk_score: int = Field(default=0, ge=0, le=100)
+    threat_points: int = 0
+    pii_points: int = 0
     threats_detected: List[ThreatMatch] = Field(default_factory=list)
     masked_text: str
     entities: List[DetectedEntity] = Field(default_factory=list)
@@ -55,15 +57,20 @@ class UnmaskResponse(BaseModel):
 
 class AuditEntry(BaseModel):
     request_id: str
+    session_id: str = ""
     timestamp: float
+    timestamp_iso: str = ""
     role: str
     endpoint: str = "/api/v1/mask"
     policy: str
     risk_score: int
     action: str
     entity_counts: Dict[str, int] = Field(default_factory=dict)
+    entity_types: List[str] = Field(default_factory=list)
+    entity_count: int = 0
     placeholders: List[str] = Field(default_factory=list)
     threat_names: List[str] = Field(default_factory=list)
+    threats: List[str] = Field(default_factory=list)
     output_scan_flagged: bool = False
 
 
@@ -91,9 +98,13 @@ class AegisSecurityMetadata(BaseModel):
     action: str
     policy_applied: str
     risk_score: int
+    threat_points: int = 0
+    pii_points: int = 0
     prompt_sent_to_llm: str
     raw_llm_output: str
     llm_mode: str = "mock"
+    model_used: str = "llama-3.3-70b-versatile"
+    is_live_groq: bool = False
     output_scan_passed: bool
     output_scan_findings: List[str] = Field(default_factory=list)
     restored_for_role: Optional[str] = None

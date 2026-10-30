@@ -51,44 +51,44 @@ export function AdminLoginModal(props: AdminLoginModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="relative w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl">
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 text-slate-400 hover:text-slate-200 transition-colors"
+          className="absolute right-3.5 top-3.5 text-zinc-500 hover:text-zinc-300 transition-colors"
           aria-label="Close modal"
         >
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" />
         </button>
 
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-            <Lock className="h-5 w-5" />
+        <div className="flex items-center gap-2.5 mb-3.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300">
+            <Lock className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-slate-100">
+            <h3 className="text-sm font-semibold text-zinc-100 font-mono">
               Admin Authentication
             </h3>
-            <p className="text-xs text-slate-400">
-              Unlock reversible unmasking and audit telemetry
+            <p className="text-[11px] text-zinc-500 font-mono">
+              Master password required
             </p>
           </div>
         </div>
 
         {error && (
-          <div className="mb-4 flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/30 px-3 py-2 text-xs text-rose-400">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
+          <div className="mb-3 flex items-center gap-2 rounded border border-rose-900/60 bg-rose-950/20 px-2.5 py-1.5 text-xs text-rose-300 font-mono">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rose-400" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3 font-mono text-xs">
           <div>
             <label
               htmlFor="admin-password"
-              className="block text-xs font-medium text-slate-300 mb-1.5"
+              className="block text-[11px] text-zinc-400 mb-1"
             >
-              Master Password
+              Password
             </label>
             <input
               id="admin-password"
@@ -96,40 +96,30 @@ export function AdminLoginModal(props: AdminLoginModalProps) {
               autoFocus
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter administrator password..."
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-all"
+              placeholder="Enter master password..."
+              className="w-full rounded border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
               required
             />
-            <p className="mt-1 text-[11px] text-slate-500">
-              Default demo password: <code className="text-cyan-400">admin</code>
+            <p className="mt-1 text-[10px] text-zinc-500">
+              Demo master password: <code className="text-zinc-300">admin</code>
             </p>
           </div>
 
-          <div className="rounded-lg bg-slate-950/60 border border-slate-800 p-3 text-xs text-slate-400 space-y-1.5">
-            <div className="flex items-center gap-1.5 font-medium text-slate-300">
-              <ShieldCheck className="h-4 w-4 text-emerald-400" />
-              <span>Zero-Trust Role Derivation</span>
-            </div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Logging in sets an httpOnly session cookie verified server-side. The client browser NEVER holds or accesses raw admin API keys.
-            </p>
-          </div>
-
-          <div className="flex items-center justify-end gap-3 pt-2">
+          <div className="flex items-center justify-end gap-2 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors"
+              className="rounded px-3 py-1.5 text-xs font-mono text-zinc-400 hover:text-zinc-200 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !password}
-              className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-cyan-500/20 hover:from-cyan-400 hover:to-blue-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 transition-all"
+              className="flex items-center gap-1.5 rounded border border-zinc-700 bg-zinc-100 text-zinc-950 px-3 py-1.5 text-xs font-semibold hover:bg-white disabled:opacity-50 transition-colors"
             >
-              {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              <span>{loading ? "Authenticating..." : "Unlock Admin Role"}</span>
+              {loading && <Loader2 className="h-3 w-3 animate-spin" />}
+              <span>{loading ? "Verifying..." : "Unlock Admin"}</span>
             </button>
           </div>
         </form>

@@ -5,18 +5,15 @@ import Link from "next/link";
 import {
   Shield,
   ArrowRight,
+  Terminal,
+  Cpu,
+  Layers,
   Lock,
-  Eye,
-  Server,
-  Zap,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
-  Cpu,
-  RefreshCw,
-  Terminal,
-  Database,
-  FileCheck,
+  Activity,
+  Server,
+  FileCode,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -27,10 +24,10 @@ export default function HomePage() {
     {
       num: 1,
       title: "1. Zero-Trust Intercept",
-      short: "Intercept",
+      short: "1. Intercept",
       desc: "Incoming requests hit /v1/chat/completions or /api/v1/mask. Client role (admin vs viewer) is derived server-side from the API key; callers can only downgrade permissions, never escalate.",
       badge: "OpenAI Wire Compatible",
-      code: `POST /v1/chat/completions
+      code: `POST /v1/chat/completions HTTP/1.1
 Authorization: Bearer aegis_live_key
 X-Session-Id: sess_984a1...
 {
@@ -40,22 +37,22 @@ X-Session-Id: sess_984a1...
     {
       num: 2,
       title: "2. Multi-Vector Threat Scan",
-      short: "Threat Scan",
-      desc: "Dual regex and ML heuristics evaluate prompt injection (+45 pts), jailbreak (+45 pts), data exfiltration (+40 pts), and secret leaks (+50 pts). SQLi is intentionally removed to focus strictly on LLM risks.",
-      badge: "Regex + ML Guards",
+      short: "2. Threat Scan",
+      desc: "High-speed regex and heuristic scanners evaluate prompt injection (+45 pts), jailbreak (+45 pts), data exfiltration (+50 pts), and secret leaks (+75 pts). SQLi is intentionally removed to focus strictly on LLM risks.",
+      badge: "Injection & Secret Guards",
       code: `Threat Analysis:
 - Prompt Injection: 0 pts
 - Jailbreak: 0 pts
 - Data Exfiltration: 0 pts
 - Secret Leak: 0 pts
-Threat Score: 0 / 100`,
+Total Threat Score: 0 pts`,
     },
     {
       num: 3,
       title: "3. Presidio + spaCy NER Scan",
-      short: "PII Detection",
-      desc: "High-sensitivity (Aadhaar, PAN, UPI, API keys = +15 pts) and medium-sensitivity (Person, Phone, Email, Location = +8 pts) entities are identified with exact character offsets. PII points are capped at 40.",
-      badge: "High & Medium Entities",
+      short: "3. PII Detection",
+      desc: "High-sensitivity (Aadhaar, PAN, UPI, API keys = +15 pts) and medium-sensitivity (Person, Phone, Email = +8 pts) entities are identified with exact character offsets. PII points are strictly capped at 40.",
+      badge: "Exact Offset Mapping",
       code: `Entities Detected:
 - PERSON: "Rahul Sharma" (indices 23..35) -> +8 pts
 - IN_PAN: "ABCDE1234F" (indices 43..53) -> +15 pts
@@ -64,11 +61,11 @@ PII Points: 23 pts (Cap: 40 pts)`,
     {
       num: 4,
       title: "4. Explicit Decision Formula",
-      short: "Decision Engine",
-      desc: "risk_score = min(100, threat_points + pii_points). If risk >= 70 or threat >= 45, request is blocked. If 0 < risk < 70, entities are masked into consistent placeholders (<PERSON_1>, <IN_PAN_1>).",
+      short: "4. Decision Engine",
+      desc: "risk_score = min(100, threat_points + pii_points). If threat_points >= 40, request is blocked. If threat_points == 0 and entities exist, request is masked into consistent placeholders (<PERSON_1>, <IN_PAN_1>).",
       badge: "Formula Driven",
       code: `Risk Score: 0 + 23 = 23 / 100
-Threshold Check: 0 < 23 < 70 -> ACTION: MASK
+Decision Rule: 0 < 23 < 70 (threats == 0) -> ACTION: MASK
 Policy Applied: "replace" (Reversible Fernet HKDF Vault)
 Placeholder Map:
   "Rahul Sharma" -> <PERSON_1>
@@ -77,9 +74,9 @@ Placeholder Map:
     {
       num: 5,
       title: "5. Sanitized Upstream to Groq LPU",
-      short: "Upstream LLM",
+      short: "5. Upstream Groq",
       desc: "Sanitized prompt is forwarded to Groq (llama-3.3-70b-versatile) with an uneditable server-side system hint instructing the model to strictly preserve placeholders. Upstream LLM NEVER sees plaintext PII.",
-      badge: "Groq LPU (Zero Raw PII)",
+      badge: "Zero Plaintext PII to LLM",
       code: `[SYSTEM]: CRITICAL: Preserve placeholders <PERSON_1>, <IN_PAN_1> verbatim.
 [USER]: Process tax refund for <PERSON_1> (PAN: <IN_PAN_1>)
 --- Upstream Groq Response ---
@@ -88,10 +85,10 @@ Placeholder Map:
     {
       num: 6,
       title: "6. Output Scan & Role-Based Reveal",
-      short: "Output Scan & Unmask",
-      desc: "Response is scanned for newly generated secrets before delivery. For Admin role, placeholders are resolved from the in-memory Fernet-HKDF vault. For Viewer role, placeholders remain masked.",
-      badge: "Role-Based Restored",
-      code: `Output Scan: 0 new secrets leaked.
+      short: "6. Role Delivery",
+      desc: "Response is scanned for newly generated secrets before delivery. For Admin role, placeholders are resolved from the in-memory Fernet-HKDF vault. For Viewer role, placeholders remain safely masked.",
+      badge: "Role-Based Delivery",
+      code: `Output Guard: 0 new secrets leaked.
 Admin Delivery (Reversible):
   "Tax refund for Rahul Sharma (tax ID ABCDE1234F) is approved."
 Viewer Delivery (Zero-Trust Masked):
@@ -100,86 +97,101 @@ Viewer Delivery (Zero-Trust Masked):
   ];
 
   return (
-    <div className="space-y-16 py-4 animate-in fade-in duration-300">
-      {/* Hero Section */}
-      <section className="relative text-center max-w-4xl mx-auto space-y-6 pt-4">
-        <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-1 text-xs font-semibold text-cyan-400">
-          <Shield className="h-3.5 w-3.5" />
-          <span>Zero-Trust LLM Privacy Gateway</span>
-        </div>
-
-        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.15]">
-          Reversible PII Pseudonymization &{" "}
-          <span className="bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-500 bg-clip-text text-transparent">
-            Threat Firewall
-          </span>
-        </h1>
-
-        <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-          A drop-in, OpenAI-compatible reverse proxy that strips sensitive PII, neutralizes prompt injections, forwards sanitized prompts to Groq, and safely unmasks replies for authorized admins.
-        </p>
-
-        <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-          <Link
-            href="/demo"
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25 hover:from-cyan-400 hover:to-blue-500 transition-all hover:scale-[1.02]"
-          >
-            <Shield className="h-4 w-4" />
-            <span>Try Live Demo</span>
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-
-          <Link
-            href="/connect"
-            className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/80 px-6 py-3 text-sm font-semibold text-slate-200 hover:border-cyan-500/40 hover:bg-slate-800 hover:text-white transition-all"
-          >
-            <Terminal className="h-4 w-4 text-cyan-400" />
-            <span>Connect in 2 Lines</span>
-          </Link>
-        </div>
-
-        {/* Quick Highlights */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6 text-left">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5">
-            <div className="text-cyan-400 font-bold text-base">Reversible</div>
-            <div className="text-xs text-slate-400 mt-0.5">HKDF + Fernet AES vault</div>
+    <div className="space-y-6">
+      {/* Console Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-800 pb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="rounded border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] font-mono text-zinc-400">
+              ARCHITECTURE & CORE SPECS
+            </span>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5">
-            <div className="text-cyan-400 font-bold text-base">Groq Upstream</div>
-            <div className="text-xs text-slate-400 mt-0.5">llama-3.3-70b-versatile</div>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5">
-            <div className="text-cyan-400 font-bold text-base">Zero Raw Logs</div>
-            <div className="text-xs text-slate-400 mt-0.5">Hard privacy constraints</div>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5">
-            <div className="text-cyan-400 font-bold text-base">Drop-In Proxy</div>
-            <div className="text-xs text-slate-400 mt-0.5">Works with OpenAI SDK</div>
-          </div>
-        </div>
-      </section>
-
-      {/* 6-Step Pipeline Breakdown */}
-      <section className="space-y-6">
-        <div className="text-center space-y-2">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            How Aegis Proxy Protects Your Pipeline
-          </h2>
-          <p className="text-sm text-slate-400 max-w-xl mx-auto">
-            Every request passes through an automated 6-stage defense ring before touching upstream model providers.
+          <h1 className="text-lg font-bold tracking-tight text-zinc-100 mt-1">
+            Aegis Proxy — Architecture & Threat Defense Engine
+          </h1>
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Drop-in OpenAI-compatible security gateway with reversible PII pseudonymization, injection firewalling, and RBAC.
           </p>
         </div>
 
-        {/* Step Selector Badges */}
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/demo"
+            className="flex items-center gap-1.5 rounded-md bg-zinc-100 text-zinc-950 px-3 py-1.5 text-xs font-semibold hover:bg-white transition-colors"
+          >
+            <Cpu className="h-3.5 w-3.5" />
+            <span>Open Playground</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+          <Link
+            href="/connect"
+            className="flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 transition-colors"
+          >
+            <Terminal className="h-3.5 w-3.5 text-zinc-400" />
+            <span>API Quickstart</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* 4-Box Technical Spec Strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-1">
+          <span className="text-[10px] uppercase text-zinc-500 font-semibold">
+            Upstream LLM Provider
+          </span>
+          <div className="font-bold text-zinc-200">Groq LPU</div>
+          <p className="text-[10px] text-zinc-500">llama-3.3-70b-versatile</p>
+        </div>
+
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-1">
+          <span className="text-[10px] uppercase text-zinc-500 font-semibold">
+            Vault Cryptography
+          </span>
+          <div className="font-bold text-zinc-200">AES-128-CBC + HKDF</div>
+          <p className="text-[10px] text-zinc-500">In-memory RAM sessions</p>
+        </div>
+
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-1">
+          <span className="text-[10px] uppercase text-zinc-500 font-semibold">
+            NER & Entity Engine
+          </span>
+          <div className="font-bold text-zinc-200">Presidio + spaCy</div>
+          <p className="text-[10px] text-zinc-500">en_core_web_sm lightweight</p>
+        </div>
+
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-1">
+          <span className="text-[10px] uppercase text-zinc-500 font-semibold">
+            Hard Privacy Rule
+          </span>
+          <div className="font-bold text-emerald-400">Zero Plaintext Logs</div>
+          <p className="text-[10px] text-zinc-500">No prompt text persisted</p>
+        </div>
+      </div>
+
+      {/* 6-Stage Pipeline Specification Inspector */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2.5">
+          <div className="flex items-center gap-2">
+            <Layers className="h-4 w-4 text-zinc-400" />
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-200">
+              6-Stage Pipeline Specification
+            </h3>
+          </div>
+          <span className="text-[11px] font-mono text-zinc-500">
+            Select a stage to view execution code & telemetry
+          </span>
+        </div>
+
+        {/* Step Selector Pills */}
+        <div className="flex flex-wrap items-center gap-1.5 font-mono text-xs">
           {steps.map((s) => (
             <button
               key={s.num}
               onClick={() => setActiveStep(s.num)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+              className={`rounded px-2.5 py-1 text-[11px] transition-colors border ${
                 activeStep === s.num
-                  ? "bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/30 scale-105"
-                  : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                  ? "border-zinc-700 bg-zinc-800 text-zinc-100 font-semibold"
+                  : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200"
               }`}
             >
               {s.short}
@@ -187,50 +199,50 @@ Viewer Delivery (Zero-Trust Masked):
           ))}
         </div>
 
-        {/* Active Step Card */}
+        {/* Active Stage Details */}
         {(() => {
           const current = steps.find((s) => s.num === activeStep) || steps[0];
           return (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 sm:p-8 backdrop-blur shadow-xl grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-              <div className="lg:col-span-6 space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start pt-1 font-mono text-xs">
+              <div className="lg:col-span-5 space-y-2.5">
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-cyan-500/20 px-2.5 py-0.5 text-xs font-mono font-semibold text-cyan-400">
-                    Step {current.num} of 6
+                  <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-bold text-zinc-300">
+                    STAGE {current.num} OF 6
                   </span>
-                  <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs text-slate-300">
+                  <span className="text-[10px] text-zinc-500">
                     {current.badge}
                   </span>
                 </div>
-                <h3 className="text-xl sm:text-2xl font-bold text-white">
+                <h4 className="text-sm font-bold text-zinc-100">
                   {current.title}
-                </h3>
-                <p className="text-sm text-slate-300 leading-relaxed">
+                </h4>
+                <p className="text-xs text-zinc-400 leading-relaxed font-sans">
                   {current.desc}
                 </p>
 
-                <div className="flex items-center gap-2 pt-2">
+                <div className="flex items-center gap-2 pt-1 text-[11px]">
                   <button
                     onClick={() => setActiveStep((prev) => (prev > 1 ? prev - 1 : 6))}
-                    className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:text-white"
+                    className="rounded border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-zinc-400 hover:text-zinc-200"
                   >
-                    &larr; Previous Step
+                    &larr; Prev
                   </button>
                   <button
                     onClick={() => setActiveStep((prev) => (prev < 6 ? prev + 1 : 1))}
-                    className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20"
+                    className="rounded border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-zinc-200 hover:bg-zinc-800"
                   >
-                    Next Step &rarr;
+                    Next &rarr;
                   </button>
                 </div>
               </div>
 
-              <div className="lg:col-span-6">
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-slate-300 shadow-inner overflow-x-auto">
-                  <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-800 text-[11px] text-slate-500">
-                    <span>STAGE {current.num} EXECUTION TELEMETRY</span>
-                    <span className="text-cyan-400">STATUS: VERIFIED</span>
+              <div className="lg:col-span-7">
+                <div className="rounded-lg border border-zinc-800 bg-black p-3 font-mono text-xs text-zinc-300 overflow-x-auto">
+                  <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-zinc-800 text-[10px] text-zinc-500">
+                    <span>TELEMETRY STAGE {current.num}</span>
+                    <span className="text-emerald-400">SPEC COMPLIANT</span>
                   </div>
-                  <pre className="text-cyan-300/90 whitespace-pre leading-relaxed font-mono">
+                  <pre className="text-zinc-300 whitespace-pre leading-relaxed text-[11px]">
                     {current.code}
                   </pre>
                 </div>
@@ -238,189 +250,122 @@ Viewer Delivery (Zero-Trust Masked):
             </div>
           );
         })()}
-      </section>
+      </div>
 
-      {/* Without Aegis vs With Aegis Interactive Toggle */}
-      <section className="space-y-6">
-        <div className="text-center space-y-2">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            Architecture Comparison
-          </h2>
-          <p className="text-sm text-slate-400">
-            See the security difference between direct LLM calls and Aegis-shielded traffic.
-          </p>
+      {/* Architecture Comparison: Direct LLM vs Aegis Zero-Trust */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-3 font-mono text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2.5">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-zinc-400" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-200">
+              Architecture Comparison Matrix
+            </h3>
+          </div>
 
-          <div className="inline-flex rounded-xl border border-slate-800 bg-slate-900/90 p-1 mt-3">
-            <button
-              onClick={() => setComparisonTab("without")}
-              className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
-                comparisonTab === "without"
-                  ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Without Aegis Proxy (Standard Direct Call)
-            </button>
+          <div className="flex items-center rounded border border-zinc-800 bg-zinc-900 p-0.5 text-[11px]">
             <button
               onClick={() => setComparisonTab("with")}
-              className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
+              className={`px-2 py-0.5 rounded transition-colors ${
                 comparisonTab === "with"
-                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-zinc-800 text-zinc-100 font-semibold"
+                  : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
-              With Aegis Proxy (Protected Gateway)
+              With Aegis Proxy (Zero-Trust)
+            </button>
+            <button
+              onClick={() => setComparisonTab("without")}
+              className={`px-2 py-0.5 rounded transition-colors ${
+                comparisonTab === "without"
+                  ? "bg-zinc-800 text-rose-400 font-semibold"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              Without Aegis (Direct LLM)
             </button>
           </div>
         </div>
 
-        {comparisonTab === "without" ? (
-          <div className="rounded-2xl border border-rose-500/30 bg-rose-950/10 p-6 sm:p-8 space-y-4">
-            <div className="flex items-center gap-2 text-rose-400 font-bold text-lg">
-              <XCircle className="h-6 w-6 shrink-0" />
-              <span>Vulnerable Direct LLM Architecture</span>
+        {comparisonTab === "with" ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+            <div className="rounded border border-zinc-800 bg-zinc-900/40 p-3 space-y-1">
+              <div className="font-bold text-zinc-200 flex items-center gap-1.5 text-xs">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                <span>Reversible HKDF Vault</span>
+              </div>
+              <p className="text-[11px] text-zinc-400 font-sans leading-relaxed">
+                Plaintext encrypted with session keys. RAM stores only ciphertext; upstream sees only placeholders.
+              </p>
             </div>
-            <p className="text-sm text-slate-300">
-              When client apps connect directly to cloud LLM providers, plain-text PII is logged in upstream server traces, fine-tuning caches, and public transcripts.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-              <div className="rounded-xl border border-rose-900/40 bg-slate-950/70 p-4 space-y-2">
-                <div className="font-semibold text-rose-300 text-sm">PII Leakage</div>
-                <p className="text-xs text-slate-400">
-                  Aadhaar, PAN, phone numbers, and customer names travel unencrypted to third-party model data centers.
-                </p>
+            <div className="rounded border border-zinc-800 bg-zinc-900/40 p-3 space-y-1">
+              <div className="font-bold text-zinc-200 flex items-center gap-1.5 text-xs">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                <span>Prompt Injection Firewall</span>
               </div>
-              <div className="rounded-xl border border-rose-900/40 bg-slate-950/70 p-4 space-y-2">
-                <div className="font-semibold text-rose-300 text-sm">Prompt Injection Risk</div>
-                <p className="text-xs text-slate-400">
-                  Instruction overrides, jailbreak phrases, and system extraction attacks run directly on the LLM without firewall gating.
-                </p>
+              <p className="text-[11px] text-zinc-400 font-sans leading-relaxed">
+                Instruction overrides, jailbreak phrases, and secret dumps are dropped at perimeter (zero tokens sent).
+              </p>
+            </div>
+            <div className="rounded border border-zinc-800 bg-zinc-900/40 p-3 space-y-1">
+              <div className="font-bold text-zinc-200 flex items-center gap-1.5 text-xs">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                <span>Enforced Server-Side RBAC</span>
               </div>
-              <div className="rounded-xl border border-rose-900/40 bg-slate-950/70 p-4 space-y-2">
-                <div className="font-semibold text-rose-300 text-sm">No Role Segregation</div>
-                <p className="text-xs text-slate-400">
-                  All viewers, external contractors, and downstream consumers see identical raw sensitive outputs.
-                </p>
-              </div>
+              <p className="text-[11px] text-zinc-400 font-sans leading-relaxed">
+                Admins see decrypted text; viewers see safe pseudonyms. Role derived server-side from API key.
+              </p>
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/10 p-6 sm:p-8 space-y-4">
-            <div className="flex items-center gap-2 text-emerald-400 font-bold text-lg">
-              <CheckCircle2 className="h-6 w-6 shrink-0" />
-              <span>Aegis Shielded Zero-Trust Architecture</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+            <div className="rounded border border-rose-900/40 bg-rose-950/10 p-3 space-y-1">
+              <div className="font-bold text-rose-300 flex items-center gap-1.5 text-xs">
+                <XCircle className="h-3.5 w-3.5 text-rose-400" />
+                <span>Plaintext PII Exfiltration</span>
+              </div>
+              <p className="text-[11px] text-zinc-400 font-sans leading-relaxed">
+                Aadhaar, PAN, and credentials travel in plaintext to third-party model servers and telemetry logs.
+              </p>
             </div>
-            <p className="text-sm text-slate-300">
-              Aegis acts as a zero-knowledge reverse proxy. Only sanitized tokens leave your perimeter, while plaintext values remain encrypted in isolated RAM sessions.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-              <div className="rounded-xl border border-emerald-900/40 bg-slate-950/70 p-4 space-y-2">
-                <div className="font-semibold text-emerald-300 text-sm">Reversible HKDF Vault</div>
-                <p className="text-xs text-slate-400">
-                  Plaintext is encrypted with per-session Fernet keys derived from HKDF. Memory dicts store only ciphertext blobs.
-                </p>
+            <div className="rounded border border-rose-900/40 bg-rose-950/10 p-3 space-y-1">
+              <div className="font-bold text-rose-300 flex items-center gap-1.5 text-xs">
+                <XCircle className="h-3.5 w-3.5 text-rose-400" />
+                <span>Unmitigated Jailbreaks</span>
               </div>
-              <div className="rounded-xl border border-emerald-900/40 bg-slate-950/70 p-4 space-y-2">
-                <div className="font-semibold text-emerald-300 text-sm">Threat Firewall</div>
-                <p className="text-xs text-slate-400">
-                  Attacks with risk score &ge; 70 or threat &ge; 45 are blocked immediately. Zero tokens sent upstream.
-                </p>
+              <p className="text-[11px] text-zinc-400 font-sans leading-relaxed">
+                DAN overrides, persona manipulation, and data exfiltration execute directly against the model.
+              </p>
+            </div>
+            <div className="rounded border border-rose-900/40 bg-rose-950/10 p-3 space-y-1">
+              <div className="font-bold text-rose-300 flex items-center gap-1.5 text-xs">
+                <XCircle className="h-3.5 w-3.5 text-rose-400" />
+                <span>Zero Role Segregation</span>
               </div>
-              <div className="rounded-xl border border-emerald-900/40 bg-slate-950/70 p-4 space-y-2">
-                <div className="font-semibold text-emerald-300 text-sm">Airtight RBAC</div>
-                <p className="text-xs text-slate-400">
-                  Admins see restored text; viewers see safely masked placeholders. X-User-Role can only downgrade permissions.
-                </p>
-              </div>
+              <p className="text-[11px] text-zinc-400 font-sans leading-relaxed">
+                All consumers, contractors, and downstream apps receive identical raw sensitive PII in responses.
+              </p>
             </div>
           </div>
         )}
-      </section>
+      </div>
 
-      {/* Trust Claims & Honest Limitations */}
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6 sm:p-8 space-y-6">
-        <div className="space-y-1">
-          <h2 className="text-xl sm:text-2xl font-bold text-white">
-            Trust Claims & Honest Engineering Limitations
-          </h2>
-          <p className="text-xs text-slate-400">
-            Transparency on what Aegis Proxy guarantees today and our technical trade-offs.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-          {/* Guaranteed Guarantees */}
-          <div className="space-y-3">
-            <h4 className="font-semibold text-emerald-400 flex items-center gap-1.5 text-sm">
-              <CheckCircle2 className="h-4 w-4" />
-              What Aegis Solves
-            </h4>
-            <ul className="space-y-2 text-slate-300">
-              <li className="flex items-start gap-2">
-                <span className="text-emerald-400 font-bold">&bull;</span>
-                <span><strong>Zero Plaintext Logging:</strong> Neither raw prompts nor vault secrets are ever written to console, disk logs, or audit tables.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-emerald-400 font-bold">&bull;</span>
-                <span><strong>Reversible Pseudonymization:</strong> Exact mapping between original entities and placeholders preserved across multi-turn dialogs.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-emerald-400 font-bold">&bull;</span>
-                <span><strong>Offline Mock Fallback:</strong> If no LLM API key is configured, an intelligent deterministic mock replies while testing offline.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-emerald-400 font-bold">&bull;</span>
-                <span><strong>Fail-Closed Production Defense:</strong> Backend refuses to boot if demo hashes or default secrets are detected in production.</span>
-              </li>
-            </ul>
+      {/* Engineering Constraints & Rationale */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-2 font-mono text-xs">
+        <h4 className="font-bold uppercase tracking-wider text-zinc-300 text-[11px]">
+          Engineering Constraints & Architecture Decisions
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] text-zinc-400 font-sans pt-1">
+          <div>
+            <strong className="text-zinc-200 font-mono">Single Worker Process:</strong> Run with <code className="text-zinc-300 font-mono">--workers 1</code> so in-memory encrypted vault and audit ring buffer stay consistent across requests.
           </div>
-
-          {/* Current Limitations */}
-          <div className="space-y-3">
-            <h4 className="font-semibold text-amber-400 flex items-center gap-1.5 text-sm">
-              <AlertTriangle className="h-4 w-4" />
-              Current Engineering Limitations
-            </h4>
-            <ul className="space-y-2 text-slate-300">
-              <li className="flex items-start gap-2">
-                <span className="text-amber-400 font-bold">&bull;</span>
-                <span><strong>No Streaming (stream=true):</strong> Presidio entity scanning and output leak redaction require the complete response buffer before delivery. Requests with stream=true return 400 Bad Request.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-amber-400 font-bold">&bull;</span>
-                <span><strong>Free-Tier Memory Ceiling:</strong> Uses spaCy <code className="text-cyan-400">en_core_web_sm</code> (~45MB) to remain strictly under Render's 512MB RAM cap. Never deploy <code className="text-amber-400">en_core_web_lg</code> on free tier.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-amber-400 font-bold">&bull;</span>
-                <span><strong>Latency Overhead:</strong> Presidio NER analysis adds approximately 50-120ms per prompt turn depending on document length.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-amber-400 font-bold">&bull;</span>
-                <span><strong>Single Worker Process:</strong> In-memory vault requires <code className="text-cyan-400">--workers 1</code> unless backed by distributed Redis.</span>
-              </li>
-            </ul>
+          <div>
+            <strong className="text-zinc-200 font-mono">Stream Rejection:</strong> <code className="text-zinc-300 font-mono">stream=true</code> returns 400 Bad Request because full-buffer analysis is required for PII redaction.
+          </div>
+          <div>
+            <strong className="text-zinc-200 font-mono">spaCy Memory Limit:</strong> Strict use of <code className="text-zinc-300 font-mono">en_core_web_sm</code> keeps total memory footprint under Render&apos;s 512MB RAM boundary.
           </div>
         </div>
-      </section>
-
-      {/* Footer CTA */}
-      <section className="text-center space-y-4 py-6 border-t border-slate-800/80">
-        <h3 className="text-xl font-bold text-white">Ready to test Aegis Proxy?</h3>
-        <div className="flex justify-center gap-4">
-          <Link
-            href="/demo"
-            className="rounded-xl bg-cyan-500 px-5 py-2.5 text-xs font-semibold text-slate-950 hover:bg-cyan-400 transition-colors shadow-lg shadow-cyan-500/20"
-          >
-            Launch Interactive Demo &rarr;
-          </Link>
-          <Link
-            href="/connect"
-            className="rounded-xl border border-slate-700 bg-slate-900 px-5 py-2.5 text-xs font-semibold text-slate-300 hover:text-white transition-colors"
-          >
-            View Code Integrations
-          </Link>
-        </div>
-      </section>
+      </div>
     </div>
   );
 }

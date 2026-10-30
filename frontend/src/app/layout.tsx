@@ -20,17 +20,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-cyan-500/20 selection:text-cyan-300 flex flex-col">
+      <body className="min-h-screen bg-zinc-950 text-zinc-100 antialiased selection:bg-zinc-800 selection:text-zinc-100 flex flex-col font-sans">
         <AegisProvider>
           <Header />
           <AdminLoginModal />
-          <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-5">
             {children}
           </main>
-          <footer className="border-t border-slate-900 bg-slate-950/60 py-6 text-center text-xs text-slate-500">
-            <p>
-              Aegis Proxy &bull; Zero-Trust Reverse Proxy &bull; Presidio + spaCy + Fernet HKDF + Groq LPU
-            </p>
+          <footer className="border-t border-zinc-900 bg-zinc-950 py-4 text-center text-[11px] text-zinc-500 font-mono">
+            <span>AEGIS PROXY v1.0 &bull; IN-MEMORY ENCRYPTED VAULT (AES-128-CBC + HKDF) &bull; GROQ LPU FIREWALL</span>
           </footer>
         </AegisProvider>
       </body>

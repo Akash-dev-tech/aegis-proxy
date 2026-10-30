@@ -249,18 +249,21 @@ class PIIEngine:
         # Step 5: Resolve overlapping spans
         chosen_results = self._resolve_overlapping_spans(mapped_results)
 
-        # Step 6: Calculate risk score (entity weights + threat weights capped at 100)
-        entity_points = sum(
+        # Step 6: Calculate risk score (entity weights capped at 40 + threat weights, capped at 100)
+        raw_entity_points = sum(
             ENTITY_WEIGHTS.get(res.entity_type, 10) for res in chosen_results
         )
-        risk_score = min(100, entity_points + threat_points)
+        pii_points = min(40, raw_entity_points)
+        risk_score = min(100, threat_points + pii_points)
 
         # Step 7: Decide action: block, mask, or allow
-        # Block if risk >= 70, threat_points >= 45, or policy==block with PII/threats found
+        # In replace, redact, and hash policy modes, PII alone (threat_points == 0) must NEVER trigger action = "block"!
+        # Only trigger action = "block" when:
+        # - policy == PolicyMode.block AND (pii_points > 0 or threat_points > 0), OR
+        # - threat_points >= 40 (an actual prompt injection, jailbreak, data exfiltration, or secret/API key leak was detected)
         is_blocked = (
-            risk_score >= 70
-            or threat_points >= 45
-            or (policy == PolicyMode.block and (chosen_results or threats_detected))
+            (policy == PolicyMode.block and (chosen_results or threats_detected))
+            or threat_points >= 40
         )
 
         if is_blocked:
@@ -270,6 +273,8 @@ class PIIEngine:
                 action="block",
                 policy_applied=policy,
                 risk_score=risk_score,
+                threat_points=threat_points,
+                pii_points=pii_points,
                 threats_detected=threats_detected,
                 masked_text="[BLOCKED]",
                 entities=[],  # Hard rule: never return PII on block
@@ -329,8 +334,8 @@ class PIIEngine:
                 masked_text[:start_idx] + repl_str + masked_text[end_idx:]
             )
 
-        # Action: mask if entities or threats detected (score >= 30 or entities present), allow otherwise
-        if detected_entities or threats_detected or risk_score >= 30:
+        # Action: mask if entities or threats detected, allow otherwise
+        if detected_entities or threats_detected:
             action = "mask"
         else:
             action = "allow"
@@ -341,6 +346,8 @@ class PIIEngine:
             action=action,
             policy_applied=policy,
             risk_score=risk_score,
+            threat_points=threat_points,
+            pii_points=pii_points,
             threats_detected=threats_detected,
             masked_text=masked_text,
             entities=detected_entities,

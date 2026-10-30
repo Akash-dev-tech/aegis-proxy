@@ -66,6 +66,8 @@ async def chat_completions(
     all_entities: List[DetectedEntity] = []
     all_threats: List[ThreatMatch] = []
     highest_risk_score = 0
+    total_threat_points = 0
+    total_pii_points = 0
     any_blocked = False
     last_user_prompt_masked = ""
 
@@ -94,6 +96,8 @@ async def chat_completions(
         all_threats.extend(mask_res.threats_detected)
         if mask_res.risk_score > highest_risk_score:
             highest_risk_score = mask_res.risk_score
+        total_threat_points = max(total_threat_points, mask_res.threat_points)
+        total_pii_points = max(total_pii_points, mask_res.pii_points)
         if mask_res.action == "block":
             any_blocked = True
 
@@ -103,10 +107,10 @@ async def chat_completions(
 
         masked_messages.append({"role": msg.role, "content": masked_content})
 
-    # Overall block decision: if action == block or policy == block with positive risk
+    # Overall block decision: if action == block or threat_points >= 40 or policy == block with positive risk
     is_blocked = (
         any_blocked
-        or highest_risk_score >= 70
+        or total_threat_points >= 40
         or (policy == PolicyMode.block and (all_entities or all_threats))
     )
 
@@ -118,6 +122,7 @@ async def chat_completions(
 
         audit_logger.record(
             request_id=request_id,
+            session_id=session_id,
             role=user.role,
             endpoint="/v1/chat/completions",
             policy=policy.value,
@@ -225,6 +230,7 @@ async def chat_completions(
 
     audit_logger.record(
         request_id=request_id,
+        session_id=session_id,
         role=user.role,
         endpoint="/v1/chat/completions",
         policy=policy.value,
@@ -238,15 +244,22 @@ async def chat_completions(
 
     # 7. Construct OpenAI response with Aegis security metadata
     llm_mode = raw_completion.get("_llm_mode", "mock" if not settings.LLM_API_KEY else "groq")
+    model_used = raw_completion.get("_model_used", raw_completion.get("model", request.model or settings.LLM_DEFAULT_MODEL))
+    is_live_groq = (llm_mode == "groq")
+
     security_meta = AegisSecurityMetadata(
         request_id=request_id,
         session_id=session_id,
         action="mask" if all_entities else "allow",
         policy_applied=policy.value,
         risk_score=highest_risk_score,
+        threat_points=total_threat_points,
+        pii_points=total_pii_points,
         prompt_sent_to_llm=last_user_prompt_masked,
         raw_llm_output=raw_reply_text,
         llm_mode=llm_mode,
+        model_used=model_used,
+        is_live_groq=is_live_groq,
         output_scan_passed=output_scan_passed,
         output_scan_findings=output_scan_findings,
         restored_for_role=restored_for_role,
@@ -258,7 +271,7 @@ async def chat_completions(
         id=raw_completion.get("id", f"chatcmpl-{request_id}"),
         object="chat.completion",
         created=raw_completion.get("created", int(time.time())),
-        model=request.model or settings.LLM_DEFAULT_MODEL,
+        model=model_used,
         choices=[
             ChatCompletionChoice(
                 index=0,

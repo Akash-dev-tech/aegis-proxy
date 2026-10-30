@@ -3,7 +3,7 @@
 import React from "react";
 import { Playground } from "@/components/Playground";
 import { useAegis } from "@/context/AegisContext";
-import { Shield, Sparkles } from "lucide-react";
+import { Shield } from "lucide-react";
 
 export default function DemoPage() {
   const {
@@ -13,32 +13,36 @@ export default function DemoPage() {
     backendStatus,
     openLoginModal,
     setPolicy,
+    toggleRole,
   } = useAegis();
 
   return (
-    <div className="space-y-6 py-2 animate-in fade-in duration-300">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-800/80">
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-zinc-800">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Shield className="h-6 w-6 text-cyan-400" />
-            Interactive Aegis Firewall & Masking Demo
+          <h1 className="text-base font-bold tracking-tight text-zinc-100 flex items-center gap-2">
+            <Shield className="h-4 w-4 text-zinc-400" />
+            Proxy Playground & Execution Telemetry
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Test Indian KYC PII detection, reversible unmasking, prompt injection gating, and live Groq LLM proxying.
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Test real-time PII pseudonymization, threat gating, and 4-hop live proxy trace.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="rounded-lg bg-slate-900 border border-slate-800 px-3 py-1.5 text-xs text-slate-300 flex items-center gap-2">
-            <span className="text-slate-500">Active Role:</span>
-            <span
-              className={`font-semibold font-mono ${
-                role === "admin" ? "text-emerald-400" : "text-cyan-400"
-              }`}
-            >
-              {role.toUpperCase()}
-            </span>
-          </div>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-zinc-500 font-mono">Effective Role:</span>
+          <span
+            className={`rounded px-2 py-0.5 text-[11px] font-mono font-semibold uppercase border ${
+              role === "admin"
+                ? "bg-zinc-900 text-emerald-400 border-zinc-700"
+                : "bg-zinc-900 text-zinc-300 border-zinc-800"
+            }`}
+          >
+            {role}
+          </span>
+          <span className="text-[11px] text-zinc-500 font-mono">
+            (Switch in top bar)
+          </span>
         </div>
       </div>
 
@@ -49,6 +53,7 @@ export default function DemoPage() {
         backendReady={backendStatus === "operational"}
         onOpenAdminModal={openLoginModal}
         onPolicyChange={setPolicy}
+        onRoleToggle={toggleRole}
       />
     </div>
   );

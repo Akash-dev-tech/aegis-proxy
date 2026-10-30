@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AEGIS_ADMIN_KEY, isAdminAuthenticated } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import {
   checkRouteRateLimit,
   forwardToBackend,
@@ -13,17 +13,6 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Too many requests. Please slow down." },
       { status: 429 }
-    );
-  }
-
-  const isAdmin = await isAdminAuthenticated();
-  if (!isAdmin) {
-    return NextResponse.json(
-      {
-        error:
-          "Admin role required to perform reversible unmasking operations.",
-      },
-      { status: 403 }
     );
   }
 
@@ -41,15 +30,18 @@ export async function POST(request: Request) {
       );
     }
 
+    const auth = await getAuthContext(request, rawBody);
+
     return await forwardToBackend({
       path: "/api/v1/unmask",
       method: "POST",
-      apiKey: AEGIS_ADMIN_KEY,
+      apiKey: auth.apiKey,
       body: {
         masked_text: parsed.data.masked_text,
         session_id: parsed.data.session_id,
       },
       sessionId: parsed.data.session_id,
+      userRole: auth.role,
     });
   } catch {
     return NextResponse.json(

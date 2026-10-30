@@ -104,10 +104,53 @@ export async function isAdminAuthenticated(): Promise<boolean> {
   }
 }
 
-export async function getAuthContext(): Promise<{
+export function resolveRoleFromRequest(
+  request: Request,
+  rawBody?: Record<string, unknown> | null
+): "admin" | "viewer" {
+  const headerRole = request.headers.get("x-user-role");
+  if (headerRole === "admin" || headerRole === "viewer") {
+    return headerRole;
+  }
+  if (rawBody && typeof rawBody === "object") {
+    const bRole = rawBody.role;
+    if (bRole === "admin" || bRole === "viewer") {
+      return bRole;
+    }
+  }
+  try {
+    const url = new URL(request.url);
+    const qRole = url.searchParams.get("role") || url.searchParams.get("userRole");
+    if (qRole === "admin" || qRole === "viewer") {
+      return qRole;
+    }
+  } catch {
+    // Ignore URL parse error
+  }
+  return "admin"; // default role for seamless demo
+}
+
+export function getAuthForRole(role: "admin" | "viewer"): {
+  role: "admin" | "viewer";
+  apiKey: string;
+} {
+  if (role === "admin") {
+    return { role: "admin", apiKey: AEGIS_ADMIN_KEY };
+  }
+  return { role: "viewer", apiKey: AEGIS_VIEWER_KEY };
+}
+
+export async function getAuthContext(
+  request?: Request,
+  rawBody?: Record<string, unknown> | null
+): Promise<{
   role: "admin" | "viewer";
   apiKey: string;
 }> {
+  if (request) {
+    const role = resolveRoleFromRequest(request, rawBody);
+    return getAuthForRole(role);
+  }
   const isAdmin = await isAdminAuthenticated();
   if (isAdmin) {
     return { role: "admin", apiKey: AEGIS_ADMIN_KEY };
